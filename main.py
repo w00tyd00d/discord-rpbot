@@ -14,6 +14,9 @@ with open(os.path.join(os.path.dirname(__file__), "settings.json")) as f:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+guild_id = 172029900901974016
+guild = None # set in on_ready
+
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
@@ -41,6 +44,8 @@ def load_data():
 
     global dungeon_master
     dungeon_master = data["DM"]
+
+    bot.get_guild()
 
 
 # parse input to return "dice", "dice_amount", "low or high", and "selection"
@@ -102,17 +107,34 @@ def filtering(rolls, hi_lo, selection):
 # dice_type: int the type of dice to be rolled as an integer signifying number of faces of dice
 def rolling_time(dice_amount, dice_type):
     return [randint(1, dice_type) for _ in range(dice_amount)]    
+    
+
+def get_member(id: int) -> discord.Member:
+    return guild.get_member(int(id))
+
 
 async def send_message(channel: discord.GroupChannel, msg: str, embed: discord.Embed = None):
+    if channel is None:
+        print("Error: Channel does not exist.")
+        return
     await channel.send(msg, embed=embed)
+
+
+async def send_direct_message(user: discord.Member, msg: str, embed: discord.Embed = None):
+    await user.create_dm()
+    await send_message(user.dm_channel, msg, embed)
 
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     
+    global guild
+    guild = bot.get_guild(guild_id)    
+    
     if settings.debug_mode:
-        await send_message("Logged in!")
+        user = get_member(172034302253596672)
+        await send_direct_message(user, "Logged in!")
     
     load_data()
     
@@ -120,6 +142,10 @@ async def on_ready():
 @bot.command()
 async def test(ctx):
     await send_message(ctx.channel, "Test successful!")
+    
+    user = get_member(172034302253596672)
+    await user.create_dm()
+    await send_message(user.dm_channel, "Test Successful!")
 
 
 @bot.command(name="dm")
@@ -130,6 +156,7 @@ async def register_dm(ctx, user):
 @bot.command(name="roll")
 async def roll_dice(ctx, to_roll, choice = None):
     parsed = parsing(to_roll, choice)
+    
     if parsed[0:5] == 'Error':
         await send_message(ctx.channel, parsed)
     else:
@@ -140,7 +167,9 @@ async def roll_dice(ctx, to_roll, choice = None):
         else:
             selected = filtering(rolls, hi_lo, selection)
             await send_message(ctx.channel, f'Selected dice: {selected}, Sum of selected dice: {sum(selected)}, every dice outcome:{rolls}')
-    pass
+    
+    print("Channel ID : ", ctx.channel.id)
+
 
 @bot.command(name="rollstats")
 async def roll_stats(ctx):
@@ -149,10 +178,12 @@ async def roll_stats(ctx):
         rolls = rolling_time(4, 6)
         selected = filtering(rolls, 'h', 3)
         await send_message(ctx.channel, f'Stats total: {sum(selected)}, rolled dice: {rolls}, dice selected (highest 3): {selected}')
+        
 
 @bot.command(name="rolldm")
 async def roll_dice_dm(ctx, to_roll, choice = None):
     pass
+
 
 if __name__ == "__main__":
     bot.run(settings.discord_token)
