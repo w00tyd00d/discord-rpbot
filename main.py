@@ -20,13 +20,13 @@ guild = None # set in on_ready
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
-dungeon_master = None
+dungeon_master_id = None
 
 
 def save_data():
     with open(save_file, "w") as f:
         data = { 
-            "DM": dungeon_master
+            "DM": dungeon_master_id
         }
 
         f.write(json.dumps(data))
@@ -42,10 +42,10 @@ def load_data():
         if f_data == "": return
         data = json.loads(f_data)
 
-    global dungeon_master
-    dungeon_master = data["DM"]
+    global dungeon_master_id
+    dungeon_master_id = data["DM"]
 
-    bot.get_guild()
+    bot.get_guild(guild_id)
 
 
 # parse input to return "dice", "dice_amount", "low or high", and "selection"
@@ -133,7 +133,7 @@ async def on_ready():
     guild = bot.get_guild(guild_id)    
     
     if settings.debug_mode:
-        user = get_member(172034302253596672)
+        user = get_member(settings.debug_user_id)
         await send_direct_message(user, "Logged in!")
     
     load_data()
@@ -143,14 +143,21 @@ async def on_ready():
 async def test(ctx):
     await send_message(ctx.channel, "Test successful!")
     
-    user = get_member(172034302253596672)
-    await user.create_dm()
-    await send_message(user.dm_channel, "Test Successful!")
+    await send_message(ctx.channel, f"The current DM is : {get_member(dungeon_master_id).display_name}")
 
 
 @bot.command(name="dm")
-async def register_dm(ctx, user):
-    pass
+async def register_dm(ctx, user : discord.Member = None):
+    user = user if user is not None else ctx.author
+
+    print(user)
+
+    global dungeon_master_id
+    dungeon_master_id = user.id
+
+    await send_message(ctx.channel, f"{user.display_name} is now the DM!")
+
+    save_data()
 
 
 @bot.command(name="roll")
