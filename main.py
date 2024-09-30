@@ -14,7 +14,7 @@ with open(os.path.join(os.path.dirname(__file__), "settings.json")) as f:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-guild_id = 172029900901974016
+guild_id = settings.guild_id
 guild = None # set in on_ready
 
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
@@ -55,8 +55,10 @@ def parsing(to_roll, choice = None):
     match_res = re.match(r"(\d+)*[a-z|A-Z]+(\d+)", to_roll)
     if match_res is None:
         return "Error: Invalid dice roll"
-    dice_amount, dice_type = map(int, match_res.group(1, 2))
+    dice_amount, dice_type = match_res.group(1, 2)
+    dice_type = int(dice_type)
     dice_amount = 1 if dice_amount == None else dice_amount
+    dice_amount = int(dice_amount)
     if dice_amount is None:
         return "Error: No dice included in input"
 
@@ -69,21 +71,23 @@ def parsing(to_roll, choice = None):
         if len(choice) == 1:
             return "Error: Selection string not accepted ensure both l or h and a number"
         match choice:
-            case 'adv', 'advantage', 'ad':
+            case 'adv' | 'advantage' | 'ad':
                 hi_lo = 'h'
                 selection = 1
                 dice_amount = 2
-            case 'dis', 'disadvantage', 'di', 'disadv':
+                return dice_amount, dice_type, hi_lo, selection
+            case 'dis' | 'disadvantage' | 'di' | 'disadv':
                 hi_lo = 'l'
                 selection = 1
                 dice_amount = 2
+                return dice_amount, dice_type, hi_lo, selection
             case _:
                 if choice.startswith('h') or choice.endswith('h'):
                     hi_lo = 'h'
                 elif choice.startswith('l') or choice.endswith('l'):
                     hi_lo = 'l'
                 else:
-                    return"Error: incorrect letter chosen, please ensure either l or h is at the start or end of string"
+                    return "Error: incorrect letter chosen, please ensure either l or h is at the start or end of string"
 
                 choice_res = re.findall(r'\d+', choice)
                 if len(choice_res)>1:
@@ -163,7 +167,6 @@ async def register_dm(ctx, user : discord.Member = None):
 @bot.command(name="roll")
 async def roll_dice(ctx, to_roll, choice = None):
     parsed = parsing(to_roll, choice)
-    
     if parsed[0:5] == 'Error':
         await send_message(ctx.channel, parsed)
     else:
@@ -189,7 +192,23 @@ async def roll_stats(ctx):
 
 @bot.command(name="rolldm")
 async def roll_dice_dm(ctx, to_roll, choice = None):
-    pass
+    parsed = parsing(to_roll, choice)
+    dm = get_member(dungeon_master_id)
+    if parsed[0:5] == 'Error':
+        await send_direct_message(ctx.author, parsed)
+    else:
+        dice_amount, dice_type, hi_lo, selection = parsed
+        rolls = rolling_time(dice_amount, dice_type)
+        if hi_lo is None:
+            await send_direct_message(ctx.author, f'Rolled dice output: {rolls}, Sum of rolls: {sum(rolls)}')
+            if ctx.author != dm:
+                await send_direct_message(dm, f'{ctx.author.display_name} rolled {dice_amount}d{dice_type} \nThey got the dice: {rolls}, summing to: {sum(rolls)}')
+        else:
+            selected = filtering(rolls, hi_lo, selection)
+            await send_direct_message(ctx.author, f'Selected dice: {selected}, Sum of selected dice: {sum(selected)}, every dice outcome:{rolls}')
+            if ctx.author != dm:
+                await send_direct_message(dm, f'{ctx.author.display_name} rolled {dice_amount}d{dice_type} \nThey got the dice: {selected}, summing to: {sum(selected)} \nThe full list of rolled dice is: {rolls}')
+#    print("Channel ID : ", ctx.channel.id)
 
 
 if __name__ == "__main__":
