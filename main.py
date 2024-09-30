@@ -20,7 +20,7 @@ guild = None # set in on_ready
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
-dungeon_master_id = 277400729562382337
+dungeon_master_id = None
 
 
 def save_data():
