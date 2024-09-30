@@ -56,6 +56,7 @@ def parsing(to_roll, choice = None):
     if match_res is None:
         return "Error: Invalid dice roll"
     dice_amount, dice_type = match_res.group(1, 2)
+    dice_type = int(dice_type)
     dice_amount = 1 if dice_amount == None else dice_amount
     dice_amount = int(dice_amount)
     if dice_amount is None:
@@ -70,12 +71,12 @@ def parsing(to_roll, choice = None):
         if len(choice) == 1:
             return "Error: Selection string not accepted ensure both l or h and a number"
         match choice:
-            case 'adv', 'advantage', 'ad':
+            case 'adv' | 'advantage' | 'ad':
                 hi_lo = 'h'
                 selection = 1
                 dice_amount = 2
                 return dice_amount, dice_type, hi_lo, selection
-            case 'dis', 'disadvantage', 'di', 'disadv':
+            case 'dis' | 'disadvantage' | 'di' | 'disadv':
                 hi_lo = 'l'
                 selection = 1
                 dice_amount = 2
