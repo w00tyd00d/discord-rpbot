@@ -14,7 +14,6 @@ with open(os.path.join(os.path.dirname(__file__), "settings.json")) as f:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-guild_id = settings.guild_id
 guild = None # set in on_ready
 
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
@@ -45,23 +44,18 @@ def load_data():
     global dungeon_master_id
     dungeon_master_id = data["DM"]
 
-    bot.get_guild(guild_id)
-
 
 # parse input to return "dice", "dice_amount", "low or high", and "selection"
 def parsing(to_roll, choice = None):
-    errors=[]
+    
     #parses to_roll to extract dice and dice_amount of dice
     match_res = re.match(r"(\d+)*[a-z|A-Z]+(\d+)", to_roll)
+    
     if match_res is None:
         return "Error: Invalid dice roll"
-    dice_amount, dice_type = match_res.group(1, 2)
-    dice_type = int(dice_type)
-    dice_amount = 1 if dice_amount == None else dice_amount
-    dice_amount = int(dice_amount)
-    if dice_amount is None:
-        return "Error: No dice included in input"
-
+    
+    dice_amount, dice_type = [int(n) if n is not None else 1 for n in match_res.group(1, 2)]
+    
     # filter for if no choice is provided
     if choice is None:
         hi_lo = None
@@ -143,6 +137,47 @@ def check_extra_ops(op1, op2):
     return True, choice, modifier
 
 
+def create_embed(rolls: list[int]) -> discord.Embed:
+    pass
+    
+    # w00t: Keeping here for embed format reference.
+    #  
+    # embed = discord.Embed(
+    #     title="Balatro: Golden Goblet",
+    #     description=f"Week {week}\n\u200B",
+    #     color=discord.Color.blue()
+    # )
+    #
+    # embed.set_image(url = deck_images[deck])
+    # embed.add_field(name="DECK", value=f"{deck} Deck")
+    # embed.add_field(name="SEED", value=seed)
+    #
+    # return embed
+
+
+def get_roll_results(to_roll, op1, op2):
+    res, choice, modifier = check_extra_ops(op1, op2)
+
+    if not res:
+        return "Invalid extra operations.", None
+
+    modifier = 0 if modifier is None else int(modifier)
+    parsed = parsing(to_roll, choice)
+    
+    if parsed[0:5] == 'Error':
+        return parsed, None
+
+    dice_amount, dice_type, hi_lo, selection = parsed
+    rolls = rolling_time(dice_amount, dice_type)
+    
+    if hi_lo is None:
+        return f'Rolled dice output: {rolls}, Modifier is {modifier}, Sum of rolls: {sum(rolls) + modifier}', None
+    else:
+        selected = filtering(rolls, hi_lo, selection)
+        return f'Selected dice: {selected}, Modifier is {modifier}, Sum of selected dice: {sum(selected) + modifier}, every dice outcome:{rolls}', None
+    
+
+
 async def send_message(channel: discord.GroupChannel, msg: str, embed: discord.Embed = None):
     if channel is None:
         print("Error: Channel does not exist.")
@@ -152,7 +187,7 @@ async def send_message(channel: discord.GroupChannel, msg: str, embed: discord.E
 
 async def send_direct_message(user: discord.Member, msg: str, embed: discord.Embed = None):
     await user.create_dm()
-    await send_message(user.dm_channel, msg, embed)
+    await send_message(user.dm_channel, msg, embed=embed)
 
 
 @bot.event
@@ -160,7 +195,7 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     
     global guild
-    guild = bot.get_guild(guild_id)    
+    guild = bot.get_guild(settings.guild_id)    
     
     if settings.debug_mode:
         user = get_member(settings.debug_user_id)
@@ -172,15 +207,12 @@ async def on_ready():
 @bot.command()
 async def test(ctx):
     await send_message(ctx.channel, "Test successful!")
-    
     await send_message(ctx.channel, f"The current DM is : {get_member(dungeon_master_id).display_name}")
 
 
 @bot.command(name="dm")
 async def register_dm(ctx, user : discord.Member = None):
     user = user if user is not None else ctx.author
-
-    print(user)
 
     global dungeon_master_id
     dungeon_master_id = user.id
@@ -192,33 +224,13 @@ async def register_dm(ctx, user : discord.Member = None):
 
 @bot.command(name="roll")
 async def roll_dice(ctx, to_roll, op1 = None, op2 = None):
-
-    res, choice, modifier = check_extra_ops(op1, op2)
-    if not res:
-        await send_message(ctx.channel, "Invalid extra operations.")
-        return
-
-    modifier = 0 if modifier is None else int(modifier)
+    string, embed = get_roll_results(to_roll, op1, op2)
+    await send_message(ctx.channel, string, embed)
     
-    parsed = parsing(to_roll, choice)
-    if parsed[0:5] == 'Error':
-        await send_message(ctx.channel, parsed)
-    else:
-        dice_amount, dice_type, hi_lo, selection = parsed
-        rolls = rolling_time(dice_amount, dice_type)
-        if hi_lo is None:
-            await send_message(ctx.channel, f'Rolled dice output: {rolls}, Modifier is {modifier}, Sum of rolls: {sum(rolls) + modifier}')
-        else:
-            selected = filtering(rolls, hi_lo, selection)
-            await send_message(ctx.channel, f'Selected dice: {selected}, Modifier is {modifier}, Sum of selected dice: {sum(selected) + modifier}, every dice outcome:{rolls}')
-    
-    print("Channel ID : ", ctx.channel.id)
-
 
 @bot.command(name="rollstats")
 async def roll_stats(ctx):
-    rolls = []
-    for _ in range(0,6):
+    for _ in range(6):
         rolls = rolling_time(4, 6)
         selected = filtering(rolls, 'h', 3)
         await send_message(ctx.channel, f'Stats total: {sum(selected)}, rolled dice: {rolls}, dice selected (highest 3): {selected}')
@@ -226,31 +238,13 @@ async def roll_stats(ctx):
 
 @bot.command(name="rolldm")
 async def roll_dice_dm(ctx, to_roll, op1 = None, op2 = None):
-
-    res, choice, modifier = check_extra_ops(op1, op2)
-    if not res:
-        await send_message(ctx.channel, "Invalid extra operations.")
-        return
-
-    modifier = 0 if modifier is None else int(modifier)
-    
-    parsed = parsing(to_roll, choice)
+    string, embed = get_roll_results(to_roll, op1, op2)
     dm = get_member(dungeon_master_id)
-    if parsed[0:5] == 'Error':
-        await send_direct_message(ctx.author, parsed)
-    else:
-        dice_amount, dice_type, hi_lo, selection = parsed
-        rolls = rolling_time(dice_amount, dice_type)
-        if hi_lo is None:
-            await send_direct_message(ctx.author, f'Rolled dice output: {rolls}, Modifier is {modifier}, Sum of rolls: {sum(rolls) + modifier}')
-            if ctx.author != dm:
-                await send_direct_message(dm, f'{ctx.author.display_name} rolled {dice_amount}d{dice_type}\nModifier is {modifier}\nThey got the dice: {rolls}, summing to: {sum(rolls) + modifier}')
-        else:
-            selected = filtering(rolls, hi_lo, selection)
-            await send_direct_message(ctx.author, f'Selected dice: {selected}, Modifier is {modifier}, Sum of selected dice: {sum(selected) + modifier}, every dice outcome:{rolls}')
-            if ctx.author != dm:
-                await send_direct_message(dm, f'{ctx.author.display_name} rolled {dice_amount}d{dice_type}\nModifier is {modifier}\nThey got the dice: {selected}, summing to: {sum(selected) + modifier} \nThe full list of rolled dice is: {rolls}')
-#    print("Channel ID : ", ctx.channel.id)
+
+    if ctx.author != dm:
+        await send_direct_message(ctx.author, string, embed)
+
+    await send_direct_message(dm, string, embed)
 
 
 if __name__ == "__main__":
