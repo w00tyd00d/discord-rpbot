@@ -206,7 +206,7 @@ def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
         return "Invalid extra operations.", None
 
     modifier = 0 if modifier is None else int(modifier)
-    parsed = parse_dice_roll(to_roll, choice)
+    parsed = parse_dice_roll(to_roll)
     
     if parsed[0:5] == 'Error':
         return parsed, None
