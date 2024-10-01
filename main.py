@@ -214,10 +214,15 @@ async def roll_dice(ctx, to_roll, op1 = None, op2 = None):
 
 @bot.command(name="rollstats")
 async def roll_stats(ctx):
-    for _ in range(6):
+    res = "Stat rolls results:\n"
+    
+    for i in range(6):
         rolls = rolling_time(4, 6)
         selected = filtering(rolls, 'h3')
-        await send_message(ctx.channel, f'Stats total: {sum(selected)}, rolled dice: {rolls}, dice selected (highest 3): {selected}')
+        res += f'Stats total: {sum(selected)}, rolled dice: {rolls}, dice selected (highest 3): {selected}'
+        if i < 5: res += "\n"
+    
+    await send_message(ctx.channel, res)
         
 
 @bot.command(name="rolldm")
