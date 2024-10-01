@@ -16,6 +16,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 guild = None # set in on_ready
 
+adv_keys = {'adv', 'advantage', 'ad'}
+dis_keys = {'dis', 'disadvantage', 'di', 'disadv'}
+
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
@@ -45,6 +48,10 @@ def load_data():
     dungeon_master_id = data["DM"]
 
 
+def get_member(id: int) -> discord.Member:
+    return guild.get_member(int(id))
+
+
 # parse input to return "dice", "dice_amount", "low or high", and "selection"
 def parsing(to_roll, choice = None):
     
@@ -52,63 +59,33 @@ def parsing(to_roll, choice = None):
     match_res = re.match(r"(\d+)*[a-z|A-Z]+(\d+)", to_roll)
     
     if match_res is None:
-        return "Error: Invalid dice roll"
+        return "Error: Invalid dice roll."
     
-    dice_amount, dice_type = [int(n) if n is not None else 1 for n in match_res.group(1, 2)]
+    return [int(n) if n is not None else 1 for n in match_res.group(1, 2)]
     
-    # filter for if no choice is provided
-    if choice is None:
-        hi_lo = None
-        selection = dice_amount
-    else:
-        choice = choice.lower()
-        if len(choice) == 1:
-            return "Error: Selection string not accepted ensure both l or h and a number"
-        match choice:
-            case 'adv' | 'advantage' | 'ad':
-                hi_lo = 'h'
-                selection = 1
-                dice_amount = 2
-                return dice_amount, dice_type, hi_lo, selection
-            case 'dis' | 'disadvantage' | 'di' | 'disadv':
-                hi_lo = 'l'
-                selection = 1
-                dice_amount = 2
-                return dice_amount, dice_type, hi_lo, selection
-            case _:
-                if choice.startswith('h') or choice.endswith('h'):
-                    hi_lo = 'h'
-                elif choice.startswith('l') or choice.endswith('l'):
-                    hi_lo = 'l'
-                else:
-                    return "Error: incorrect letter chosen, please ensure either l or h is at the start or end of string"
 
-                choice_res = re.findall(r'\d+', choice)
-                if len(choice_res)>1:
-                    return "Error: Selection string not accepted"
-                else:
-                    
-                    selection = int(choice_res[0])
+def filtering(rolls, choice):
+    hi_lo, selection = None, 1
 
-                if selection > dice_amount:
-                    print("Error: Not enough dice rolled for selection")
-                    selection = min(dice_amount, selection)
+    if choice in adv_keys: hi_lo = 'h'
+    if choice in dis_keys: hi_lo = 'l'
+    
+    if not hi_lo:
+        res = re.match(r"([hlHL])(\d+)|(\d+)([hlHL])", choice)
+        if not res:
+            return "Error: Invalid choice parameter given."
 
-    return dice_amount, dice_type, hi_lo, selection
-
-def filtering(rolls, hi_lo, selection):
+        hi_lo = res.group(1) if not res.group(1).isdigit() else res.group(2)
+        selection = int(res.group(1)) if res.group(1).isdigit() else int(res.group(2))
+        
     # Reduce the selection of rolled dice based on parameters
-    selected = sorted(rolls, reverse = True if hi_lo == 'h' else False)[:selection]
-    return selected
+    return sorted(rolls, reverse = True if hi_lo == 'h' else False)[:selection]
+
 
 # dice_amount: int showing amount of total dice to be rolled
 # dice_type: int the type of dice to be rolled as an integer signifying number of faces of dice
 def rolling_time(dice_amount, dice_type):
     return [randint(1, dice_type) for _ in range(dice_amount)]    
-    
-
-def get_member(id: int) -> discord.Member:
-    return guild.get_member(int(id))
 
 
 def check_extra_ops(op1, op2):
@@ -116,23 +93,28 @@ def check_extra_ops(op1, op2):
 
     for op in [op1, op2]:
         if op is None: continue
+
+        if op in adv_keys or op in dis_keys:
+            if choice is not None:
+                return False, choice, modifier
+            choice = op
+            continue
         
         if op.isdigit():
             if modifier is not None:
                 return False, choice, modifier
             modifier = int(op)
-        elif len(op) != 2:
-            return False, choice, modifier
+            continue
         
         if ((op[0].isdigit() and op[-1] in ("h", "l")) or
             (op[-1].isdigit() and op[0] in ("h", "l"))):
                 if choice is not None:
                     return False, choice, modifier
                 choice = op
-        elif op[0] in ("+", "-") and op[1:].isdigit():
+        elif op[0] in {"+", "-"} and op[1:].isdigit():
             if modifier is not None:
                 return False, choice, modifier
-            modifier = op
+            modifier = int(op)
 
     return True, choice, modifier
 
@@ -167,16 +149,18 @@ def get_roll_results(to_roll, op1, op2):
     if parsed[0:5] == 'Error':
         return parsed, None
 
-    dice_amount, dice_type, hi_lo, selection = parsed
-    rolls = rolling_time(dice_amount, dice_type)
+    rolls = rolling_time(*parsed)
     
-    if hi_lo is None:
+    if choice is None:
         return f'Rolled dice output: {rolls}, Modifier is {modifier}, Sum of rolls: {sum(rolls) + modifier}', None
-    else:
-        selected = filtering(rolls, hi_lo, selection)
-        return f'Selected dice: {selected}, Modifier is {modifier}, Sum of selected dice: {sum(selected) + modifier}, every dice outcome:{rolls}', None
-    
 
+    selected = filtering(rolls, choice)
+
+    if type(selected) == str:
+        return selected, None
+    
+    return f'Selected dice: {selected}, Modifier is {modifier}, Sum of selected dice: {sum(selected) + modifier}, every dice outcome:{rolls}', None
+    
 
 async def send_message(channel: discord.GroupChannel, msg: str, embed: discord.Embed = None):
     if channel is None:
@@ -232,7 +216,7 @@ async def roll_dice(ctx, to_roll, op1 = None, op2 = None):
 async def roll_stats(ctx):
     for _ in range(6):
         rolls = rolling_time(4, 6)
-        selected = filtering(rolls, 'h', 3)
+        selected = filtering(rolls, 'h3')
         await send_message(ctx.channel, f'Stats total: {sum(selected)}, rolled dice: {rolls}, dice selected (highest 3): {selected}')
         
 
