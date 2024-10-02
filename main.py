@@ -19,6 +19,8 @@ guild = None # set in on_ready
 adv_keys = {'adv', 'advantage', 'ad'}
 dis_keys = {'dis', 'disadvantage', 'di', 'disadv'}
 
+embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
+
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
@@ -166,22 +168,50 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
     return True, choice, modifier
 
 
-def create_embed(rolls: list[int]) -> discord.Embed:
-    pass
+def create_roll_embed(rolls: list[int], selection: list[int] = None, modifier: int|str = None) -> discord.Embed:
+    embed = discord.Embed(
+        title="Roll Results",
+        description=", ".join([str(n) for n in rolls]),
+        color=discord.Color.blue()
+    )
     
-    # w00t: Keeping here for embed format reference.
-    #  
-    # embed = discord.Embed(
-    #     title="Balatro: Golden Goblet",
-    #     description=f"Week {week}\n\u200B",
-    #     color=discord.Color.blue()
-    # )
-    #
-    # embed.set_image(url = deck_images[deck])
-    # embed.add_field(name="DECK", value=f"{deck} Deck")
-    # embed.add_field(name="SEED", value=seed)
-    #
-    # return embed
+    embed.set_thumbnail(url=embed_thumbnail)
+
+    if selection:
+        embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
+    
+    if modifier:
+        if type(modifier) == str:
+            # ADD PROFILE SUPPORT HERE
+            modifier = 0
+        embed.add_field(name="Modifier", value="{0:+}".format(modifier))
+    
+    modifier = 0 if modifier is None else modifier
+    result = sum(selection) if selection else sum(rolls)
+
+    embed.add_field(name="Result", value=f'{result + modifier}', inline=False)
+    
+    return embed
+
+
+def create_stat_roll_embed(rolls: list[list], selections: list[list]) -> discord.Embed:
+    desc_string = "\n".join([", ".join([str(n) for n in roll]) for roll in rolls])
+    
+    embed = discord.Embed(
+        title="Roll Results",
+        description=desc_string,
+        color=discord.Color.blue()
+    )
+    
+    embed.set_thumbnail(url=embed_thumbnail)
+
+    selstr = "\n".join([", ".join([str(n) for n in roll]) for roll in selections])
+    result = ", ".join([sum(r) for r in selections])
+    
+    embed.add_field(name="Selection", value=selstr)
+    embed.add_field(name="Result", value=result, inline=False)
+    
+    return embed
 
 
 def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
