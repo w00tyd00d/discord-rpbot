@@ -19,6 +19,8 @@ guild = None # set in on_ready
 adv_keys = {'adv', 'advantage', 'ad'}
 dis_keys = {'dis', 'disadvantage', 'di', 'disadv'}
 
+stat_keys = {"STR", "DEX", "CON", "WIS", "INT", "CHA"}
+
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
@@ -137,33 +139,39 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    
     choice, modifier = None, None
+    
+    def is_choice(op: str) -> bool:
+        if  (op in adv_keys or op in dis_keys
+            (op[0].isdigit() and op[-1] in ("h", "l")) or
+            (op[-1].isdigit() and op[0] in ("h", "l"))):
+                return True
+        return False
+
+    def is_modifier(op: str) -> bool:
+        if (op in stat_keys or
+            op.isdigit() or
+            op[0] in {"+", "-"} and op[1:].isdigit()):
+                return True
+        return False
 
     for op in [op1, op2]:
         if op is None: continue
 
-        if op in adv_keys or op in dis_keys:
+        if is_choice(op):
             if choice is not None:
                 return False, choice, modifier
             choice = op
-            continue
-        
-        if op.isdigit():
+        elif is_modifier(op):
             if modifier is not None:
                 return False, choice, modifier
-            modifier = int(op)
-            continue
-        
-        if ((op[0].isdigit() and op[-1] in ("h", "l")) or
-            (op[-1].isdigit() and op[0] in ("h", "l"))):
-                if choice is not None:
-                    return False, choice, modifier
-                choice = op
-        elif op[0] in {"+", "-"} and op[1:].isdigit():
-            if modifier is not None:
-                return False, choice, modifier
-            modifier = int(op)
+            if op in stat_keys:
+                # ADD PROFILE SUPPORT HERE
+                modifier = 0
+            else:
+                modifier = int(op)
+        else:
+            return False, choice, modifier
 
     return True, choice, modifier
 
@@ -180,15 +188,13 @@ def create_roll_embed(rolls: list[int], selection: list[int] = None, modifier: i
     if selection:
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
-    if modifier:
-        if type(modifier) == str:
-            # ADD PROFILE SUPPORT HERE
-            modifier = 0
+    if modifier is not None:
         embed.add_field(name="Modifier", value="{0:+}".format(modifier))
+    else:
+        # Hard set modifier to 0 for sum calculation
+        modifier = 0
     
-    modifier = 0 if modifier is None else modifier
     result = sum(selection) if selection else sum(rolls)
-
     embed.add_field(name="Result", value=f'{result + modifier}', inline=False)
     
     return embed
@@ -198,7 +204,7 @@ def create_stat_roll_embed(rolls: list[list], selections: list[list]) -> discord
     desc_string = "\n".join([", ".join([str(n) for n in roll]) for roll in rolls])
     
     embed = discord.Embed(
-        title="Roll Results",
+        title="Stat Roll Results",
         description=desc_string,
         color=discord.Color.blue()
     )
@@ -234,6 +240,8 @@ def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
 
     if not res:
         return "Invalid extra operations.", None
+
+
 
     modifier = 0 if modifier is None else int(modifier)
     parsed = parse_dice_roll(to_roll)
