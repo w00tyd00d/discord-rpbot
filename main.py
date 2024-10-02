@@ -19,6 +19,10 @@ guild = None # set in on_ready
 adv_keys = {'adv', 'advantage', 'ad'}
 dis_keys = {'dis', 'disadvantage', 'di', 'disadv'}
 
+stat_keys = {"STR", "DEX", "CON", "WIS", "INT", "CHA"}
+
+embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
+
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
@@ -64,7 +68,7 @@ def parse_dice_roll(to_roll: str) -> list[int]:
         [int: Parsed dice roll instruction]
     """
     
-    #parses to_roll to extract dice and dice_amount of dice
+    # Stistows: parses to_roll to extract dice and dice_amount of dice
     match_res = re.match(r"(\d+)*[a-z|A-Z]+(\d+)", to_roll)
     
     if match_res is None:
@@ -101,7 +105,7 @@ def filter_dice_rolls(rolls: list[int], choice: str) -> list[int]:
         hi_lo = res.group(1) if not res.group(1).isdigit() else res.group(2)
         selection = int(res.group(1)) if res.group(1).isdigit() else int(res.group(2))
         
-    # Reduce the selection of rolled dice based on parameters
+    # Stistows: Reduce the selection of rolled dice based on parameters
     return sorted(rolls, reverse = True if hi_lo == 'h' else False)[:selection]
 
 
@@ -135,53 +139,119 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    
     choice, modifier = None, None
+    
+    def is_choice(op: str) -> bool:
+        if  (op in adv_keys or op in dis_keys or
+            (op[0].isdigit() and op[-1] in ("h", "l")) or
+            (op[-1].isdigit() and op[0] in ("h", "l"))):
+                return True
+        return False
+
+    def is_modifier(op: str) -> bool:
+        if (op in stat_keys or
+            op.isdigit() or
+            op[0] in {"+", "-"} and op[1:].isdigit()):
+                return True
+        return False
 
     for op in [op1, op2]:
         if op is None: continue
 
-        if op in adv_keys or op in dis_keys:
+        if is_choice(op):
             if choice is not None:
                 return False, choice, modifier
-            choice = op
-            continue
-        
-        if op.isdigit():
-            if modifier is not None:
-                return False, choice, modifier
-            modifier = int(op)
-            continue
-        
-        if ((op[0].isdigit() and op[-1] in ("h", "l")) or
-            (op[-1].isdigit() and op[0] in ("h", "l"))):
-                if choice is not None:
-                    return False, choice, modifier
+            
+            if choice in adv_keys:
+                choice = "h1"
+            elif choice in dis_keys:
+                choice = "l1"
+            else:
                 choice = op
-        elif op[0] in {"+", "-"} and op[1:].isdigit():
+        elif is_modifier(op):
             if modifier is not None:
                 return False, choice, modifier
-            modifier = int(op)
+            modifier = op if op in stat_keys else int(op)
+        else:
+            return False, choice, modifier
 
     return True, choice, modifier
 
 
-def create_embed(rolls: list[int]) -> discord.Embed:
-    pass
+def create_roll_embed(rolls: list[int], selection: list[int] = None, modifier: int|str = None) -> discord.Embed:
+    """
+    Creates and returns an embed to display the results of a roll command.
+
+    Params:
+        rolls: This list of resulting rolls made
+        selection: The filtered selection, if one exists
+        modifier: The additional modifier, if one exists
+
+    Returns:
+        discord.Embed: A rich discord embed object containing the results of the
+            roll command
+    """
     
-    # w00t: Keeping here for embed format reference.
-    #  
-    # embed = discord.Embed(
-    #     title="Balatro: Golden Goblet",
-    #     description=f"Week {week}\n\u200B",
-    #     color=discord.Color.blue()
-    # )
-    #
-    # embed.set_image(url = deck_images[deck])
-    # embed.add_field(name="DECK", value=f"{deck} Deck")
-    # embed.add_field(name="SEED", value=seed)
-    #
-    # return embed
+    embed = discord.Embed(
+        title="Roll Results",
+        description=", ".join([str(n) for n in rolls]),
+        color=discord.Color.blue()
+    )
+    
+    embed.set_thumbnail(url=embed_thumbnail)
+
+    if selection:
+        embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
+    
+    if modifier is not None:
+        if modifier in stat_keys:
+            # w00t: ADD PROFILE SUPPORT HERE
+            modstr = f"{0:+} ({modifier.upper()})"
+            modifier = 0
+        else:
+            modstr = f"{modifier:+}"
+
+        embed.add_field(name="Modifier", value=modstr)
+    else:
+        # w00t: Hard set modifier to 0 for sum calculation
+        modifier = 0
+    
+    result = sum(selection) if selection else sum(rolls)
+    embed.add_field(name="Result", value=f'{result + modifier}', inline=False)
+    
+    return embed
+
+
+def create_stat_roll_embed(rolls: list[list], selections: list[list]) -> discord.Embed:
+    """
+    Creates and returns an embed to display the results of a roll stats command.
+
+    Params:
+        rolls: This list of each resulting roll made for each stat
+        selections: The filtered selection of each stat roll
+
+    Returns:
+        discord.Embed: A rich discord embed object containing the results of the
+            roll stats command
+    """
+    
+    desc_string = "\n".join([", ".join([str(n) for n in roll]) for roll in rolls])
+    
+    embed = discord.Embed(
+        title="Stat Roll Results",
+        description=desc_string,
+        color=discord.Color.blue()
+    )
+    
+    embed.set_thumbnail(url=embed_thumbnail)
+
+    selstr = "\n".join([", ".join([str(n) for n in roll]) for roll in selections])
+    result = ", ".join([str(sum(r)) for r in selections])
+    
+    embed.add_field(name="Selection", value=selstr)
+    embed.add_field(name="Result", value=result, inline=False)
+    
+    return embed
 
 
 def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
@@ -205,23 +275,16 @@ def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
     if not res:
         return "Invalid extra operations.", None
 
-    modifier = 0 if modifier is None else int(modifier)
-    parsed = parse_dice_roll(to_roll, choice)
+    parsed = parse_dice_roll(to_roll)
     
     if parsed[0:5] == 'Error':
         return parsed, None
 
     rolls = rolling_time(*parsed)
+    selected = filter_dice_rolls(rolls, choice) if choice else None
+    embed = create_roll_embed(rolls, selected, modifier)
     
-    if choice is None:
-        return f'Rolled dice output: {rolls}, Modifier is {modifier}, Sum of rolls: {sum(rolls) + modifier}', None
-
-    selected = filter_dice_rolls(rolls, choice)
-
-    if type(selected) == str:
-        return selected, None
-    
-    return f'Selected dice: {selected}, Modifier is {modifier}, Sum of selected dice: {sum(selected) + modifier}, every dice outcome:{rolls}', None
+    return "", embed
     
 
 async def send_message(channel: discord.GroupChannel, msg: str, embed: discord.Embed = None):
@@ -272,20 +335,7 @@ async def register_dm(ctx, user : discord.Member = None):
 async def roll_dice(ctx, to_roll, op1 = None, op2 = None):
     string, embed = get_roll_results(to_roll, op1, op2)
     await send_message(ctx.channel, string, embed)
-    
 
-@bot.command(name="rollstats")
-async def roll_stats(ctx):
-    res = "Stat rolls results:\n"
-    
-    for i in range(6):
-        rolls = rolling_time(4, 6)
-        selected = filter_dice_rolls(rolls, 'h3')
-        res += f'Stats total: {sum(selected)}, rolled dice: {rolls}, dice selected (highest 3): {selected}'
-        if i < 5: res += "\n"
-    
-    await send_message(ctx.channel, res)
-        
 
 @bot.command(name="rolldm")
 async def roll_dice_dm(ctx, to_roll, op1 = None, op2 = None):
@@ -296,6 +346,22 @@ async def roll_dice_dm(ctx, to_roll, op1 = None, op2 = None):
         await send_direct_message(ctx.author, string, embed)
 
     await send_direct_message(dm, string, embed)
+    
+
+@bot.command(name="rollstats")
+async def roll_stats(ctx):
+    all_rolls = []
+    all_selected = []
+    
+    for i in range(6):
+        rolls = rolling_time(4, 6)
+        selected = filter_dice_rolls(rolls, 'h3')
+
+        all_rolls.append(rolls)
+        all_selected.append(selected)
+    
+    embed = create_stat_roll_embed(all_rolls, all_selected)
+    await send_message(ctx.channel, "", embed)
 
 
 if __name__ == "__main__":
