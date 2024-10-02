@@ -161,7 +161,13 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
         if is_choice(op):
             if choice is not None:
                 return False, choice, modifier
-            choice = op
+            
+            if choice in adv_keys:
+                choice = "h1"
+            elif choice in dis_keys:
+                choice = "l1"
+            else:
+                choice = op
         elif is_modifier(op):
             if modifier is not None:
                 return False, choice, modifier
