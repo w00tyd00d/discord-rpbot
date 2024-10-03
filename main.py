@@ -1,7 +1,7 @@
 import discord, json, os, re
 
 from pathlib import Path
-from discord.ext import tasks, commands
+from discord.ext import commands
 from random import randint
 
 class Struct:
@@ -16,10 +16,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 guild = None # set in on_ready
 
-adv_keys = {'adv', 'advantage', 'ad'}
-dis_keys = {'dis', 'disadvantage', 'di', 'disadv'}
-
-stat_keys = {"STR", "DEX", "CON", "WIS", "INT", "CHA"}
+adv_keys = ("advantage",)
+dis_keys = ("disadvantage",)
+stat_keys = ("strength", "dexterity", "constitution", "wisdom", "intelligence", "charisma")
 
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
@@ -52,6 +51,17 @@ def load_data():
     dungeon_master_id = data["DM"]
 
 
+def is_lazy_key(tup: tuple, key: str) -> bool:
+    """Checks if lazy key belongs to corresponding key set."""
+    if not key or len(key) < 3:
+        return False
+
+    for k in tup:
+        if k.startswith(key.lower()):
+            return True
+    return False
+
+
 def get_member(id: int) -> discord.Member:
     """Returns a discord.Member object from the guild using a user id."""
     return guild.get_member(int(id))
@@ -69,7 +79,7 @@ def parse_dice_roll(to_roll: str) -> list[int]:
     """
     
     # Stistows: parses to_roll to extract dice and dice_amount of dice
-    match_res = re.match(r"(\d+)*[a-z|A-Z]+(\d+)", to_roll)
+    match_res = re.match(r"(\d+)*[dD]+(\d+)", to_roll)
     
     if match_res is None:
        return "Error: Invalid dice roll."
@@ -89,21 +99,17 @@ def filter_dice_rolls(rolls: list[int], choice: str) -> list[int]:
         [int: Filtered dice roll result(s)]
     """
 
-    hi_lo, selection = None, 1
+    # hi_lo, selection = None, 1
 
-    if choice in adv_keys: hi_lo = 'h'
-    if choice in dis_keys: hi_lo = 'l'
+    res = re.match(r"([hlHL])(\d+)|(\d+)([hlHL])", choice)
+    if not res:
+        return "Error: Invalid choice parameter given."
+
+    grp1, grp2 = res.group(1, 2)
+    hi_lo, selection = (grp1, int(grp2)) if grp2.isdigit() else (grp2, int(grp1))
     
-    if not hi_lo:
-        res = re.match(r"([hlHL])(\d+)|(\d+)([hlHL])", choice)
-        if not res:
-            return "Error: Invalid choice parameter given."
-
-        grp1, grp2 = res.group(1, 2)
-        hi_lo, selection = (grp1, int(grp2)) if grp2.isdigit() else (grp2, int(grp1))
-        
-        hi_lo = res.group(1) if not res.group(1).isdigit() else res.group(2)
-        selection = int(res.group(1)) if res.group(1).isdigit() else int(res.group(2))
+    hi_lo = res.group(1) if not res.group(1).isdigit() else res.group(2)
+    selection = int(res.group(1)) if res.group(1).isdigit() else int(res.group(2))
         
     # Stistows: Reduce the selection of rolled dice based on parameters
     return sorted(rolls, reverse = True if hi_lo == 'h' else False)[:selection]
@@ -142,14 +148,13 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
     choice, modifier = None, None
     
     def is_choice(op: str) -> bool:
-        if  (op in adv_keys or op in dis_keys or
-            (op[0].isdigit() and op[-1] in ("h", "l")) or
-            (op[-1].isdigit() and op[0] in ("h", "l"))):
+        if ((op[0].isdigit() and op[-1] in {"h", "l"}) or
+            (op[-1].isdigit() and op[0] in {"h", "l"})):
                 return True
         return False
 
     def is_modifier(op: str) -> bool:
-        if (op in stat_keys or
+        if (is_lazy_key(stat_keys, op) or
             op.isdigit() or
             op[0] in {"+", "-"} and op[1:].isdigit()):
                 return True
@@ -161,24 +166,18 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
         if is_choice(op):
             if choice is not None:
                 return False, choice, modifier
-            
-            if choice in adv_keys:
-                choice = "h1"
-            elif choice in dis_keys:
-                choice = "l1"
-            else:
-                choice = op
+            choice = op
         elif is_modifier(op):
             if modifier is not None:
                 return False, choice, modifier
-            modifier = op if op in stat_keys else int(op)
+            modifier = op if is_lazy_key(stat_keys, op) else int(op)
         else:
             return False, choice, modifier
 
     return True, choice, modifier
 
 
-def create_roll_embed(rolls: list[int], selection: list[int] = None, modifier: int|str = None) -> discord.Embed:
+def create_roll_embed(dice_type: str, rolls: list[int], selection: list[int] = None, modifier: int|str = None) -> discord.Embed:
     """
     Creates and returns an embed to display the results of a roll command.
 
@@ -193,7 +192,7 @@ def create_roll_embed(rolls: list[int], selection: list[int] = None, modifier: i
     """
     
     embed = discord.Embed(
-        title="Roll Results",
+        title=f"D{dice_type} Roll Results",
         description=", ".join([str(n) for n in rolls]),
         color=discord.Color.blue()
     )
@@ -204,9 +203,9 @@ def create_roll_embed(rolls: list[int], selection: list[int] = None, modifier: i
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
     if modifier is not None:
-        if modifier in stat_keys:
+        if is_lazy_key(stat_keys, modifier):
             # w00t: ADD PROFILE SUPPORT HERE
-            modstr = f"{0:+} ({modifier.upper()})"
+            modstr = f"{0:+} ({modifier.upper()[:3]})"
             modifier = 0
         else:
             modstr = f"{modifier:+}"
@@ -270,6 +269,24 @@ def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
         discord.Embed: The rich embed object displaying the results
     """
     
+    if is_lazy_key(adv_keys, to_roll) or is_lazy_key(dis_keys, to_roll):
+        if op1 is not None and op2 is not None:
+            return "Invalid extra operations.", None
+
+        op2 = "h1" if is_lazy_key(adv_keys, to_roll) else "l1"
+        to_roll = "2d20"
+
+    elif is_lazy_key(stat_keys, to_roll):
+        if op1 is not None and op2 is not None:
+            return "Invalid extra operations.", None
+
+        is_adv_key = is_lazy_key(adv_keys, op1)
+        is_dis_key = is_lazy_key(dis_keys, op1)
+
+        op2 = to_roll
+        to_roll = "2d20" if is_adv_key or is_dis_key else "d20"
+        op1 = "h1" if is_adv_key else "l1"
+    
     res, choice, modifier = parse_extra_ops(op1, op2)
 
     if not res:
@@ -282,7 +299,7 @@ def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
 
     rolls = rolling_time(*parsed)
     selected = filter_dice_rolls(rolls, choice) if choice else None
-    embed = create_roll_embed(rolls, selected, modifier)
+    embed = create_roll_embed(parsed[1], rolls, selected, modifier)
     
     return "", embed
     
@@ -332,20 +349,22 @@ async def register_dm(ctx, user : discord.Member = None):
 
 
 @bot.command(name="roll")
-async def roll_dice(ctx, to_roll, op1 = None, op2 = None):
+async def roll_dice(ctx, to_roll = "d20", op1 = None, op2 = None):
     string, embed = get_roll_results(to_roll, op1, op2)
     await send_message(ctx.channel, string, embed)
 
 
 @bot.command(name="rolldm")
-async def roll_dice_dm(ctx, to_roll, op1 = None, op2 = None):
+async def roll_dice_dm(ctx, to_roll = "d20", op1 = None, op2 = None):
     string, embed = get_roll_results(to_roll, op1, op2)
     dm = get_member(dungeon_master_id)
 
-    if ctx.author != dm:
+    if ctx.author != dm or not embed:
         await send_direct_message(ctx.author, string, embed)
 
-    await send_direct_message(dm, string, embed)
+    if embed:
+        string = f"{ctx.author.display_name} rolled the dice!\n" # ADD QUIP FUNCTION HERE
+        await send_direct_message(dm, string, embed)
     
 
 @bot.command(name="rollstats")
