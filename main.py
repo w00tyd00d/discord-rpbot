@@ -1,7 +1,7 @@
 import discord, json, os, re
 
 from pathlib import Path
-from discord.ext import tasks, commands
+from discord.ext import commands
 from random import randint
 
 class Struct:
