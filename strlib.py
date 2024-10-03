@@ -36,9 +36,9 @@ skill_keys = {
 }
 
 
-def is_lazy_key(tup: tuple, key: str) -> bool:
+def is_lazy_key(tup: tuple, key: str, min_size = 3) -> bool:
     """Checks if lazy key belongs to corresponding key set."""
-    if not key or len(key) < 3:
+    if not key or len(key) < min_size:
         return False
 
     for k in tup:

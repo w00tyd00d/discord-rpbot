@@ -67,7 +67,7 @@ def rolling_time(dice_amount: int, dice_type: int) -> list[int]:
     return [randint(1, dice_type) for _ in range(dice_amount)]    
 
 
-def parse_extra_ops(op1: str, op2: str) -> tuple:
+def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
     """
     Parses any additional operation given by a roll command and returns
     them in a deterministic order.
@@ -83,7 +83,7 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    choice, modifier = None, None
+    to_roll, choice, modifier = None, None, None
     
     def is_choice(op: str) -> bool:
         if ((op[0].isdigit() and op[-1] in {"h", "l"}) or
@@ -98,24 +98,36 @@ def parse_extra_ops(op1: str, op2: str) -> tuple:
                 return True
         return False
 
-    for op in [op1, op2]:
+    for op in [op1, op2, op3]:
         if op is None: continue
 
-        if is_choice(op):
+        if re.match(r"(\d+)*[dD]+(\d+)", op) is not None:
+            to_roll = op
+
+        elif is_lazy_key(adv_keys, op) or is_lazy_key(dis_keys, op):
+            if choice is not None or to_roll is not None:
+                return False, to_roll, choice, modifier
+
+            choice = "h1" if is_lazy_key(adv_keys, op) else "l1"
+            to_roll = "2d20"
+
+        elif is_choice(op):
             if choice is not None:
-                return False, choice, modifier
+                return False, to_roll, choice, modifier
             choice = op
+            
         elif is_modifier(op):
             if modifier is not None:
-                return False, choice, modifier
+                return False, to_roll, choice, modifier
             modifier = op if is_lazy_key(stat_keys, op) else int(op)
+
         else:
-            return False, choice, modifier
+            return False, to_roll, choice, modifier
 
-    return True, choice, modifier
+    return True, to_roll, choice, modifier
 
 
-def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
+def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
     """
     Returns the results of a roll command.
 
@@ -131,28 +143,12 @@ def get_roll_results(to_roll: str, op1: str, op2: str) -> tuple:
         discord.Embed: The rich embed object displaying the results
     """
     
-    if is_lazy_key(adv_keys, to_roll) or is_lazy_key(dis_keys, to_roll):
-        if op1 is not None and op2 is not None:
-            return "Invalid extra operations.", None
-
-        op2 = "h1" if is_lazy_key(adv_keys, to_roll) else "l1"
-        to_roll = "2d20"
-
-    elif is_lazy_key(stat_keys, to_roll):
-        if op1 is not None and op2 is not None:
-            return "Invalid extra operations.", None
-
-        is_adv_key = is_lazy_key(adv_keys, op1)
-        is_dis_key = is_lazy_key(dis_keys, op1)
-
-        op2 = to_roll
-        to_roll = "2d20" if is_adv_key or is_dis_key else "d20"
-        op1 = "h1" if is_adv_key else "l1"
-    
-    res, choice, modifier = parse_extra_ops(op1, op2)
+    res, to_roll, choice, modifier = parse_arguments(op1, op2, op3)
 
     if not res:
         return "Invalid extra operations.", None
+
+    to_roll = "d20" if to_roll is None else to_roll
 
     parsed = parse_dice_roll(to_roll)
     
