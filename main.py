@@ -359,10 +359,12 @@ async def roll_dice_dm(ctx, to_roll = "d20", op1 = None, op2 = None):
     string, embed = get_roll_results(to_roll, op1, op2)
     dm = get_member(dungeon_master_id)
 
-    if ctx.author != dm:
+    if ctx.author != dm or not embed:
         await send_direct_message(ctx.author, string, embed)
 
-    await send_direct_message(dm, string, embed)
+    if embed:
+        string = f"{ctx.author.display_name} rolled the dice!\n" # ADD QUIP FUNCTION HERE
+        await send_direct_message(dm, string, embed)
     
 
 @bot.command(name="rollstats")
