@@ -46,8 +46,17 @@ class Character:
     
     def save(self):
         save_file = os.path.join(os.path.dirname(__file__), f"data/profiles/{self.player_id}.json")
-        with open(save_file, "w") as f:
-            f.write(json.dumps(self.__dict__))
+        mode = "r+" if Path(save_file) else "w+"
+        
+        with open(save_file, mode) as f:
+            profile = json.loads(f.read())
+
+            if self.name not in profile.characters:
+                profile.characters[self.name] = {}
+            
+            profile.characters[self.name].update(self.__dict__)
+
+            f.write(json.dumps(profile))      
 
 
 with open(os.path.join(os.path.dirname(__file__), "settings.json")) as f:
@@ -69,7 +78,7 @@ player_id: {
     characters: dict
 }
 """
-profiles = {}
+characters = {}
 
 
 def save_data():
@@ -82,7 +91,7 @@ def save_data():
 
 
 def load_data():
-    if not Path(save_file):
+    if not Path(save_file).exists():
         print(f"Invalid file path: {save_file}")
         return
         
@@ -99,6 +108,39 @@ def get_member(id: int) -> discord.Member:
     """Returns a discord.Member object from the guild using a user id."""
     return guild.get_member(int(id))
 
+
+def profile_exists(id: int) -> str:
+    return Path(f"data/profiles/{id}.json").exists()
+
+
+def load_character(id: int, character: str = None):
+    if not profile_exists(id):
+        return
+
+    with open(f"data/profiles/{id}.json", "r+"):
+        f_data = f.read()
+        if f_data == "": return
+        data = json.loads(f_data)
+    
+        character = character if character else data["current_character"]
+        if not character:
+            return
+        
+        characters[id] = Character(**data["characters"][character])
+        
+        data["current_character"] = character
+        f.write(json.dumps(data))
+
+
+def get_character(id: int) -> Character:
+    if id not in characters:
+        load_character(id)
+    
+    if id in characters:
+        return characters[id]
+    
+    return {}
+    
 
 @bot.event
 async def on_ready():
