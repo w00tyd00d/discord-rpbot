@@ -1,11 +1,11 @@
-import discord
+import discord, math
 
 from strlib import *
 
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
 
-def create_roll_embed(dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None) -> discord.Embed:
+def create_roll_embed(character, dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None) -> discord.Embed:
     """
     Creates and returns an embed to display the results of a roll command.
 
@@ -46,36 +46,39 @@ def create_roll_embed(dice_type: int, rolls: list[int], selection: list[int] = N
     if selection:
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
-    plvl, pmod = 0, 0
+    prof_mod = 0
     
     if modifier is not None or prof is not None:
         modstr = ""
 
-        if type(modifier) == str:
-            # w00t: ADD PROFILE SUPPORT HERE
-            modstr += f"{0:+} ({modifier.upper()[:3]})\n"
-            modifier = 0
+        # Stat modifier
+        if type(modifier) is str and character:
+            stat = get_lazy_key(stat_keys, modifier)
+            modifier = character.get_stat_modifier(stat)
+            modstr += f"{modifier:+} ({stat.upper()[:3]})\n"
 
-        elif type(prof) == str:
-            
-            ability = skill_keys[skill]
-            modstr += f"{0:+} ({ability.upper()[:3]})\n"
+        elif type(prof) is str and character:
+            stat = get_lazy_key(stat_keys, skill_keys[skill])
+            modifier = character.get_stat_modifier(stat)
+            modstr += f"{modifier:+} ({stat.upper()[:3]})\n"
 
-        elif modifier is not None:
+        elif modifier is not None and type(modifier) is int:
             modstr = f"{modifier:+}"
         
-        if skill and plvl > 0:
-            # w00t: ADD PROFILE SUPPORT HERE
-            modstr += f"{plvl*pmod:+} ({"PRO" if plvl == 1 else "EXP"})"
+        # Proficiency modifier
+        if skill and character and (prof_lvl := character.get_proficiency(skill)) > 0:
+            prof_mod = character.get_proficiency_modifier(skill)
+            modstr += f"{prof_mod:+} ({"EXP" if prof_lvl > 1 else "PRO"})"
 
-        embed.add_field(name="Modifier", value=modstr)
+        if modstr:
+            embed.add_field(name="Modifier", value=modstr)
     
-    if modifier is None:
+    if modifier is None or not type(modifier) is int:
         # w00t: Hard set modifier to 0 for sum calculation
         modifier = 0
 
     result = sum(selection) if selection else sum(rolls)
-    total = result + modifier + (plvl * pmod)
+    total = result + modifier + prof_mod
     embed.add_field(name="Result", value=f'{total}', inline=False)
     
     return embed

@@ -133,7 +133,7 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
     return [True, to_roll, choice, modifier, skill]
 
 
-def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
+def get_roll_results(char, op1: str, op2: str, op3: str) -> tuple:
     """
     Returns the results of a roll command.
 
@@ -163,6 +163,6 @@ def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
 
     rolls = rolling_time(*parsed)
     selected = filter_dice_rolls(rolls, choice) if choice else None
-    embed = create_roll_embed(parsed[1], rolls, selected, modifier, skill)
+    embed = create_roll_embed(char, parsed[1], rolls, selected, modifier, skill)
     
     return "", embed

@@ -38,7 +38,7 @@ skill_keys = {
 
 def get_lazy_key(data: tuple|dict, key: str, min_size = 3) -> str|None:
     """Checks if lazy key belongs to corresponding key set."""
-    if not key or len(key) < min_size:
+    if not key or type(key) is not str or len(key) < min_size:
         return None
 
     for k in data:
