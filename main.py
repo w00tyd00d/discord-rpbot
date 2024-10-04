@@ -9,6 +9,47 @@ class Struct:
     def __init__(self, data):
         self.__dict__.update(data)
 
+class Character:
+    def __init__(self, **data):
+        self.player_id = data["player_id"]
+        
+        self.name = data["name"]
+        self.job = data["job"]
+        self.level = data["level"]
+
+        self.strength = data["strength"]
+        self.dexterity = data["dexterity"]
+        self.constitution = data["constitution"]
+        self.wisdom = data["wisdom"]
+        self.intelligence = data["intelligence"]
+        self.charisma = data["charisma"]
+
+        self.proficiencies = data["proficiencies"]
+    
+    def get_proficiency(self, skill: str) -> int:
+        if skill not in self.proficiencies:
+            return 0
+        return self.proficiencies[skill]
+    
+    def edit_data(self, key: str, val: str|int) -> None:
+        if hasattr(self, key):
+            if type(getattr(self, key, False)) != type(val):
+                return
+            setattr(self, key, val)
+    
+    def edit_proficiency(self, skill: str, val: int) -> None:
+        if val == 0:
+            self.proficiencies.pop(skill, None)
+            return
+            
+        self.proficiencies[skill] = val
+    
+    def save(self):
+        save_file = os.path.join(os.path.dirname(__file__), f"data/profiles/{self.player_id}.json")
+        with open(save_file, "w") as f:
+            f.write(json.dumps(self.__dict__))
+
+
 with open(os.path.join(os.path.dirname(__file__), "settings.json")) as f:
     settings = Struct(json.loads(f.read()))
 
@@ -21,6 +62,14 @@ save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
 
 # Serialized data
 dungeon_master_id = None
+
+"""
+player_id: {
+    current_character: str,
+    characters: dict
+}
+"""
+profiles = {}
 
 
 def save_data():
