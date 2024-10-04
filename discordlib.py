@@ -18,8 +18,14 @@ def create_roll_embed(dice_type: int, rolls: list[int], selection: list[int] = N
         discord.Embed: A rich discord embed object containing the results of the
             roll command
     """
+
     skill = get_lazy_key(skill_keys, prof, 4)
-    roll_type = f"{skill.capitalize()}\n" if skill else f"D{dice_type} "
+    roll_type = f"D{dice_type} "
+    
+    if skill:
+        roll_type = f"{skill.capitalize()}\n"
+    elif modifier and (key := get_lazy_key(stat_keys, modifier)):
+        roll_type = f"{key.capitalize()}\n"
 
     group = selection if selection is not None else rolls
     color = discord.Color.dark_gold() if 20 in group else discord.Color.blue()
