@@ -36,12 +36,13 @@ skill_keys = {
 }
 
 
-def is_lazy_key(tup: tuple, key: str, min_size = 3) -> bool:
+def get_lazy_key(data: tuple|dict, key: str, min_size = 3) -> str|None:
     """Checks if lazy key belongs to corresponding key set."""
     if not key or len(key) < min_size:
-        return False
+        return None
 
-    for k in tup:
+    for k in data:
         if k.startswith(key.lower()):
-            return True
-    return False
+            return k
+    
+    return None

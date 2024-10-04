@@ -5,7 +5,7 @@ from strlib import *
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
 
-def create_roll_embed(dice_type: str, rolls: list[int], selection: list[int] = None, modifier: int|str = None) -> discord.Embed:
+def create_roll_embed(dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None) -> discord.Embed:
     """
     Creates and returns an embed to display the results of a roll command.
 
@@ -18,11 +18,21 @@ def create_roll_embed(dice_type: str, rolls: list[int], selection: list[int] = N
         discord.Embed: A rich discord embed object containing the results of the
             roll command
     """
+    skill = get_lazy_key(skill_keys, prof, 4)
+    roll_type = f"{skill.capitalize()}\n" if skill else f"D{dice_type} "
+
+    group = selection if selection is not None else rolls
+    color = discord.Color.dark_gold() if 20 in group else discord.Color.blue()
     
+    if (dice_type == 20 and
+        color != discord.Color.dark_gold() and
+        1 in group):
+            color = discord.Color.dark_red()
+
     embed = discord.Embed(
-        title=f"D{dice_type} Roll Results",
+        title=f"{roll_type}Roll Results",
         description=", ".join([str(n) for n in rolls]),
-        color=discord.Color.blue()
+        color=color
     )
     
     embed.set_thumbnail(url=embed_thumbnail)
@@ -30,21 +40,37 @@ def create_roll_embed(dice_type: str, rolls: list[int], selection: list[int] = N
     if selection:
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
-    if modifier is not None:
-        if is_lazy_key(stat_keys, modifier):
+    plvl, pmod = 0, 0
+    
+    if modifier is not None or prof is not None:
+        modstr = ""
+
+        if type(modifier) == str:
             # w00t: ADD PROFILE SUPPORT HERE
-            modstr = f"{0:+} ({modifier.upper()[:3]})"
+            modstr += f"{0:+} ({modifier.upper()[:3]})\n"
             modifier = 0
-        else:
+
+        elif type(prof) == str:
+            
+            ability = skill_keys[skill]
+            modstr += f"{0:+} ({ability.upper()[:3]})\n"
+
+        elif modifier is not None:
             modstr = f"{modifier:+}"
+        
+        if skill and plvl > 0:
+            # w00t: ADD PROFILE SUPPORT HERE
+            modstr += f"{plvl*pmod:+} ({"PRO" if plvl == 1 else "EXP"})"
 
         embed.add_field(name="Modifier", value=modstr)
-    else:
+    
+    if modifier is None:
         # w00t: Hard set modifier to 0 for sum calculation
         modifier = 0
-    
+
     result = sum(selection) if selection else sum(rolls)
-    embed.add_field(name="Result", value=f'{result + modifier}', inline=False)
+    total = result + modifier + (plvl * pmod)
+    embed.add_field(name="Result", value=f'{total}', inline=False)
     
     return embed
 

@@ -5,7 +5,7 @@ from discordlib import create_roll_embed
 from random import randint
 
 
-def parse_dice_roll(to_roll: str) -> list[int]:
+def parse_dice_roll(to_roll: str) -> list[int]|str:
     """
     Parses the dice roll instruction and returns numeric values.
 
@@ -83,7 +83,7 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    to_roll, choice, modifier = None, None, None
+    to_roll, choice, modifier, skill = None, None, None, None
     
     def is_choice(op: str) -> bool:
         if ((op[0].isdigit() and op[-1] in {"h", "l"}) or
@@ -92,7 +92,7 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
         return False
 
     def is_modifier(op: str) -> bool:
-        if (is_lazy_key(stat_keys, op) or
+        if (get_lazy_key(stat_keys, op) or
             op.isdigit() or
             op[0] in {"+", "-"} and op[1:].isdigit()):
                 return True
@@ -104,27 +104,33 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
         if re.match(r"(\d+)*[dD]+(\d+)", op) is not None:
             to_roll = op
 
-        elif is_lazy_key(adv_keys, op) or is_lazy_key(dis_keys, op):
-            if choice is not None or to_roll is not None:
-                return False, to_roll, choice, modifier
+        elif get_lazy_key(adv_keys, op) or get_lazy_key(dis_keys, op):
+            if choice is not None:
+                return [False]
 
-            choice = "h1" if is_lazy_key(adv_keys, op) else "l1"
-            to_roll = "2d20"
-
+            choice = "h1" if get_lazy_key(adv_keys, op) else "l1"
+            to_roll = "2d20" if to_roll is None else to_roll
+        
+        elif get_lazy_key(skill_keys, op, 4):
+            if skill is not None:
+                return [False]
+            
+            skill = op
+            
         elif is_choice(op):
             if choice is not None:
-                return False, to_roll, choice, modifier
+                return [False]
             choice = op
             
         elif is_modifier(op):
             if modifier is not None:
-                return False, to_roll, choice, modifier
-            modifier = op if is_lazy_key(stat_keys, op) else int(op)
+                return [False]
+            modifier = op if get_lazy_key(stat_keys, op) else int(op)
 
         else:
-            return False, to_roll, choice, modifier
+            return [False]
 
-    return True, to_roll, choice, modifier
+    return [True, to_roll, choice, modifier, skill]
 
 
 def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
@@ -143,20 +149,20 @@ def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
         discord.Embed: The rich embed object displaying the results
     """
     
-    res, to_roll, choice, modifier = parse_arguments(op1, op2, op3)
+    res = parse_arguments(op1, op2, op3)
 
-    if not res:
+    if not res[0]:
         return "Invalid extra operations.", None
 
-    to_roll = "d20" if to_roll is None else to_roll
+    to_roll, choice, modifier, skill = res[1:]
 
-    parsed = parse_dice_roll(to_roll)
+    parsed = parse_dice_roll("d20" if to_roll is None else to_roll)
     
-    if parsed[0:5] == 'Error':
+    if type(parsed) == str:
         return parsed, None
 
     rolls = rolling_time(*parsed)
     selected = filter_dice_rolls(rolls, choice) if choice else None
-    embed = create_roll_embed(parsed[1], rolls, selected, modifier)
+    embed = create_roll_embed(parsed[1], rolls, selected, modifier, skill)
     
     return "", embed
