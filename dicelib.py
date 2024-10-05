@@ -67,7 +67,8 @@ def rolling_time(dice_amount: int, dice_type: int) -> list[int]:
     return [randint(1, dice_type) for _ in range(dice_amount)]    
 
 
-def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
+# def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
+def parse_arguments(*ops) -> tuple:
     """
     Parses any additional operation given by a roll command and returns
     them in a deterministic order.
@@ -83,7 +84,20 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    to_roll, choice, modifier, skill, save_roll = None, None, None, None, False
+    to_roll = None
+    choice = None
+    stat = None
+    skill = None
+    save_roll = False
+    
+    res = {
+        "to_roll": None,
+        "choice": None,
+        "modifier": None,
+        "skill": None,
+        "save_roll": False,
+        "flats": []
+    }
     
     def is_choice(op: str) -> bool:
         if ((op[0].isdigit() and op[-1] in {"h", "l"}) or
@@ -91,54 +105,55 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
                 return True
         return False
 
-    def is_modifier(op: str) -> bool:
-        if (get_lazy_key(stat_keys, op) or
-            op.isdigit() or
+    def is_number(op: str) -> bool:
+        if (op.isdigit() or
             op[0] in {"+", "-"} and op[1:].isdigit()):
                 return True
         return False
 
-    for op in [op1, op2, op3]:
-        if op is None: continue
-
+    for op in ops:
         if re.match(r"(\d+)*[dD]+(\d+)", op) is not None:
-            to_roll = op
+            res["to_roll"] = op
 
         elif op in {"sav", "save"}:
-            if save_roll:
-                return [False]
-            save_roll = True
+            if res["save_roll"]:
+                return [False, res]
+            res["save_roll"] = True
 
         elif get_lazy_key(adv_keys, op) or get_lazy_key(dis_keys, op):
-            if choice is not None:
-                return [False]
+            if res["choice"] is not None:
+                return [False, res]
 
-            choice = "h1" if get_lazy_key(adv_keys, op) else "l1"
-            to_roll = "2d20" if to_roll is None else to_roll
+            res["choice"] = "h1" if get_lazy_key(adv_keys, op) else "l1"
+            res["to_roll"] = "2d20" if to_roll is None else to_roll
         
-        elif get_lazy_key(skill_keys, op, 4):
-            if skill is not None:
-                return [False]
+        elif (lkey := get_lazy_key(skill_keys, op, 4)):
+            if res["skill"] is not None:
+                return [False, res]
+            res["skill"] = lkey
             
-            skill = op
+        elif (lkey := get_lazy_key(stat_keys, op)):
+            if res["stat"] is not None:
+                return [False, res]
+            res["stat"] = lkey
             
         elif is_choice(op):
-            if choice is not None:
-                return [False]
-            choice = op
-            
-        elif is_modifier(op):
-            if modifier is not None:
-                return [False]
-            modifier = op if get_lazy_key(stat_keys, op) else int(op)
+            if res["choice"] is not None:
+                return [False, res]
+            res["choice"] = op
+
+        elif is_number(op):
+            res["flats"].append(op)
 
         else:
-            return [False]
+            return [False, res]
 
-    return [True, to_roll, choice, modifier, skill, save_roll]
+    # return [True, to_roll, choice, stat, skill, save_roll]
+    return [True, res]
 
 
-def get_roll_results(char, op1: str, op2: str, op3: str) -> tuple:
+# def get_roll_results(char, op1: str, op2: str, op3: str) -> tuple:
+def get_roll_results(char, *ops) -> tuple:
     """
     Returns the results of a roll command.
 
@@ -154,12 +169,13 @@ def get_roll_results(char, op1: str, op2: str, op3: str) -> tuple:
         discord.Embed: The rich embed object displaying the results
     """
     
-    res = parse_arguments(op1, op2, op3)
+    valid, res = parse_arguments(*ops)
 
     if not res[0]:
         return "Invalid extra operations.", None
 
-    to_roll, choice, modifier, skill, save_roll = res[1:]
+    # to_roll, choice, modifier, skill, save_roll = res[1:]
+
 
     parsed = parse_dice_roll("d20" if to_roll is None else to_roll)
     
