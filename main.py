@@ -120,5 +120,12 @@ async def roll_stats(ctx):
     await send_message(ctx.channel, "", embed)
 
 
+@bot.command(aliases=["char", "character"])
+async def get_character_info(ctx, name = None):
+    character = get_character(ctx.author.id)
+    embed = create_character_embed(character)
+    await send_message(ctx.channel, "", embed)
+
+
 if __name__ == "__main__":
     bot.run(settings.discord_token)

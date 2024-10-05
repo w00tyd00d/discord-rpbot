@@ -21,6 +21,10 @@ class Character:
 
         self.proficiencies = data["proficiencies"]
     
+    @staticmethod
+    def proficiency_calculation(lvl: int) -> int:
+        return ((lvl - 1) // 4 + 2)  
+    
     def get_stat_modifier(self, stat: str) -> int:
         if not hasattr(self, stat):
             return 0
@@ -30,8 +34,8 @@ class Character:
     def get_proficiency(self, skill: str) -> int:
         return self.proficiencies.get(skill, 0)
     
-    def get_proficiency_modifier(self, skill: str):
-        return ((self.level - 1) // 4 + 2) * self.get_proficiency(skill)
+    def get_proficiency_modifier(self, skill: str, force_lvl = None):
+        return Character.proficiency_calculation(self.level) * self.get_proficiency(skill)
 
     def edit_data(self, key: str, val: str|int) -> None:
         if hasattr(self, key):

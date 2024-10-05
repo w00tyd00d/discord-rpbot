@@ -1,6 +1,7 @@
 import discord, math
 
 from strlib import *
+from characterlib import Character
 
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
@@ -112,6 +113,52 @@ def create_stat_roll_embed(rolls: list[list], selections: list[list]) -> discord
     
     embed.add_field(name="Selection", value=selstr)
     embed.add_field(name="Result", value=result, inline=False)
+    
+    return embed
+
+
+def create_character_embed(character) -> discord.Embed:
+    """
+    Creates and returns an embed to display the player's character stats.
+
+    Params:
+        character: The character object wished to be inspected
+
+    Returns:
+        discord.Embed: A rich discord embed object containing the data of
+            a character
+    """
+    
+    embed = discord.Embed(
+        title=character.name,
+        description=f"Level {character.level} {character.job}",
+        color=discord.Color.blue()
+    )
+    
+    embed.set_thumbnail(url=embed_thumbnail)
+
+    
+    embed.add_field(name="Strength",        value=f"{character.strength} ({character.get_stat_modifier("strength"):+})")
+    embed.add_field(name="Intelligence",    value=f"{character.intelligence} ({character.get_stat_modifier("intelligence"):+})")
+    
+    embed.add_field(name=" ", value=" ", inline=False)
+    
+    embed.add_field(name="Dexterity",       value=f"{character.dexterity} ({character.get_stat_modifier("dexterity"):+})")
+    embed.add_field(name="Wisdom",          value=f"{character.wisdom} ({character.get_stat_modifier("wisdom"):+})")
+    
+    embed.add_field(name=" ", value=" ", inline=False)
+    
+    embed.add_field(name="Constitution",    value=f"{character.constitution} ({character.get_stat_modifier("constitution"):+})")
+    embed.add_field(name="Charisma",        value=f"{character.charisma} ({character.get_stat_modifier("charisma"):+})")
+    
+    embed.add_field(name=" ", value=" ", inline=False)
+
+    saving_throws = "\n".join(get_lazy_key(stat_keys, stat).capitalize() for stat in job_keys[character.job]["saving_throws"])
+    proficiencies = "\n".join(prof.capitalize() for prof in character.proficiencies.keys())
+    prof_bonus = Character.proficiency_calculation(character.level)
+
+    embed.add_field(name="Saving Throws",   value=f"{saving_throws}\n({prof_bonus:+})")
+    embed.add_field(name="Proficiencies",   value=proficiencies)
     
     return embed
 
