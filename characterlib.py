@@ -37,34 +37,42 @@ class Character:
     def get_proficiency_modifier(self, skill: str, force_lvl = None):
         return Character.proficiency_calculation(self.level) * self.get_proficiency(skill)
 
-    def edit_data(self, key: str, val: str|int) -> None:
+    def edit_data(self, key: str, val: str|int) -> bool:
         if hasattr(self, key):
             attr = getattr(self, key, False)
-            if attr is not None and type(attr) != type(val):
-                return
+            if attr is not None and type(attr) is int:
+                if not val.isdigit():
+                    return False
+                val = int(val)
+            
             setattr(self, key, val)
             self.save()
+            return True
+
+        return False
     
     def edit_proficiency(self, skill: str, val: int) -> None:
         if val == 0:
             self.proficiencies.pop(skill, None)
-            return
-            
-        self.proficiencies[skill] = val
+        else:            
+            self.proficiencies[skill] = val
+        
         self.save()
     
     def save(self):
         save_file = os.path.join(os.path.dirname(__file__), f"data/profiles/{self.player_id}.json")
-        mode = "w+" #"r+" if Path(save_file) else "w+"
+        mode = "r+"
         
         with open(save_file, mode) as f:
             profile = json.loads(f.read())
 
-            if self.name not in profile.characters:
+            if self.name not in profile["characters"]:
                 profile.characters[self.name] = {}
             
-            profile.characters[self.name].update(self.__dict__)
+            profile["characters"][self.name].update(self.__dict__)
 
+            f.seek(0)
+            f.truncate()
             f.write(json.dumps(profile))
 
 

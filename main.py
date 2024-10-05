@@ -127,5 +127,33 @@ async def get_character_info(ctx, name = None):
     await send_message(ctx.channel, "", embed)
 
 
+@bot.command(name="edit")
+async def edit_character_info(ctx, key = None, val1 = None, val2 = None):
+    character = get_character(ctx.author.id)
+    
+    if key is None:
+        await send_message(ctx.channel, "Error: Please enter valid editable field")
+        return
+    
+    if "proficiencies".startswith(key):
+        if not (skill := get_lazy_key(skill_keys, val1, 4)):
+            await send_message(ctx.channel, "Error: Please enter valid skill name/abbreviation")
+            return
+        if val2 not in {"0", "1", "2"}:
+            await send_message(ctx.channel, "Error: Please include valid proficiency level (0-2)")
+            return
+        character.edit_proficiency(skill, int(val2))
+    elif (attr := get_lazy_key(character.__dict__, key)):
+        if val1 is None or not character.edit_data(attr, val1):
+            await send_message(ctx.channel, "Error: Please enter valid data to field")
+            return
+    else:
+        await send_message(ctx.channel, "Error: Please enter valid editable field")
+        return
+    
+    embed = create_character_embed(character)
+    await send_message(ctx.channel, "Successfully updated character.", embed)
+
+
 if __name__ == "__main__":
     bot.run(settings.discord_token)

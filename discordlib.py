@@ -136,7 +136,6 @@ def create_character_embed(character) -> discord.Embed:
     )
     
     embed.set_thumbnail(url=embed_thumbnail)
-
     
     embed.add_field(name="Strength",        value=f"{character.strength} ({character.get_stat_modifier("strength"):+})")
     embed.add_field(name="Intelligence",    value=f"{character.intelligence} ({character.get_stat_modifier("intelligence"):+})")
@@ -154,7 +153,7 @@ def create_character_embed(character) -> discord.Embed:
     embed.add_field(name=" ", value=" ", inline=False)
 
     saving_throws = "\n".join(get_lazy_key(stat_keys, stat).capitalize() for stat in job_keys[character.job]["saving_throws"])
-    proficiencies = "\n".join(prof.capitalize() for prof in character.proficiencies.keys())
+    proficiencies = "\n".join(f"{prof.capitalize()}{" (EXP)" if character.get_proficiency(prof) == 2 else ""}" for prof in character.proficiencies.keys())
     prof_bonus = Character.proficiency_calculation(character.level)
 
     embed.add_field(name="Saving Throws",   value=f"{saving_throws}\n({prof_bonus:+})")
