@@ -2,6 +2,7 @@ import discord, json, os
 
 from discordlib import *
 from dicelib import *
+from characterlib import get_character
 from pathlib import Path
 from discord.ext import commands
 
@@ -14,7 +15,6 @@ with open(os.path.join(os.path.dirname(__file__), "settings.json")) as f:
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
-
 guild = None # set at on_ready event
 
 save_file = os.path.join(os.path.dirname(__file__), "data/main.json")
@@ -33,7 +33,7 @@ def save_data():
 
 
 def load_data():
-    if not Path(save_file):
+    if not Path(save_file).exists():
         print(f"Invalid file path: {save_file}")
         return
         
@@ -85,13 +85,15 @@ async def register_dm(ctx, user : discord.Member = None):
 
 @bot.command(name="roll")
 async def roll_dice(ctx, op1 = None, op2 = None, op3 = None):
-    string, embed = get_roll_results(op1, op2, op3)
+    character = get_character(ctx.author.id)
+    string, embed = get_roll_results(character, op1, op2, op3)
     await send_message(ctx.channel, string, embed)
 
 
 @bot.command(name="rolldm")
 async def roll_dice_dm(ctx, op1 = None, op2 = None, op3 = None):
-    string, embed = get_roll_results(op1, op2, op3)
+    character = get_character(ctx.author.id)
+    string, embed = get_roll_results(character, op1, op2, op3)
     dm = get_member(dungeon_master_id)
 
     if ctx.author != dm or not embed:
@@ -116,6 +118,41 @@ async def roll_stats(ctx):
     
     embed = create_stat_roll_embed(all_rolls, all_selected)
     await send_message(ctx.channel, "", embed)
+
+
+@bot.command(aliases=["char", "character"])
+async def get_character_info(ctx, name = None):
+    character = get_character(ctx.author.id)
+    embed = create_character_embed(character)
+    await send_message(ctx.channel, "", embed)
+
+
+@bot.command(name="edit")
+async def edit_character_info(ctx, key = None, val1 = None, val2 = None):
+    character = get_character(ctx.author.id)
+    
+    if key is None:
+        await send_message(ctx.channel, "Error: Please enter valid editable field")
+        return
+    
+    if "proficiencies".startswith(key):
+        if not (skill := get_lazy_key(skill_keys, val1, 4)):
+            await send_message(ctx.channel, "Error: Please enter valid skill name/abbreviation")
+            return
+        if val2 not in {"0", "1", "2"}:
+            await send_message(ctx.channel, "Error: Please include valid proficiency level (0-2)")
+            return
+        character.edit_proficiency(skill, int(val2))
+    elif (attr := get_lazy_key(character.__dict__, key)):
+        if val1 is None or not character.edit_data(attr, val1):
+            await send_message(ctx.channel, "Error: Please enter valid data to field")
+            return
+    else:
+        await send_message(ctx.channel, "Error: Please enter valid editable field")
+        return
+    
+    embed = create_character_embed(character)
+    await send_message(ctx.channel, "Successfully updated character.", embed)
 
 
 if __name__ == "__main__":

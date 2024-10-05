@@ -1,11 +1,12 @@
-import discord
+import discord, math
 
 from strlib import *
+from characterlib import Character
 
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
 
-def create_roll_embed(dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None) -> discord.Embed:
+def create_roll_embed(character, dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None, save_roll = False) -> discord.Embed:
     """
     Creates and returns an embed to display the results of a roll command.
 
@@ -46,36 +47,46 @@ def create_roll_embed(dice_type: int, rolls: list[int], selection: list[int] = N
     if selection:
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
-    plvl, pmod = 0, 0
+    prof_mod = 0
+    save_mod = 0
     
-    if modifier is not None or prof is not None:
+    if modifier is not None or prof is not None or save_mod is not None:
         modstr = ""
+        mod_stat = get_lazy_key(stat_keys, modifier)
 
-        if type(modifier) == str:
-            # w00t: ADD PROFILE SUPPORT HERE
-            modstr += f"{0:+} ({modifier.upper()[:3]})\n"
-            modifier = 0
+        # Stat modifier
+        if type(modifier) is str and character:
+            modifier = character.get_stat_modifier(mod_stat)
+            modstr += f"{modifier:+} ({mod_stat.upper()[:3]})\n"
 
-        elif type(prof) == str:
-            
-            ability = skill_keys[skill]
-            modstr += f"{0:+} ({ability.upper()[:3]})\n"
+        # elif type(prof) is str and character:
+        elif skill and character:
+            stat = get_lazy_key(stat_keys, skill_keys[skill])
+            modifier = character.get_stat_modifier(stat)
+            modstr += f"{modifier:+} ({stat.upper()[:3]})\n"
 
-        elif modifier is not None:
+        elif modifier is not None and type(modifier) is int:
             modstr = f"{modifier:+}"
         
-        if skill and plvl > 0:
-            # w00t: ADD PROFILE SUPPORT HERE
-            modstr += f"{plvl*pmod:+} ({"PRO" if plvl == 1 else "EXP"})"
+        # Proficiency modifier
+        if skill and character and (prof_lvl := character.get_proficiency(skill)) > 0:
+            prof_mod = character.get_proficiency_modifier(skill)
+            modstr += f"{prof_mod:+} ({"EXP" if prof_lvl > 1 else "PRO"})"
+        
+        # Save roll
+        if save_roll and mod_stat and mod_stat in job_keys[character.job]["saving_throws"]:
+            save_mod = Character.proficiency_calculation(character.level)
+            modstr += f"{save_mod:+} (SAVE)"
 
-        embed.add_field(name="Modifier", value=modstr)
+        if modstr:
+            embed.add_field(name="Modifier", value=modstr)
     
-    if modifier is None:
+    if modifier is None or not type(modifier) is int:
         # w00t: Hard set modifier to 0 for sum calculation
         modifier = 0
 
     result = sum(selection) if selection else sum(rolls)
-    total = result + modifier + (plvl * pmod)
+    total = result + modifier + prof_mod + save_mod
     embed.add_field(name="Result", value=f'{total}', inline=False)
     
     return embed
@@ -109,6 +120,51 @@ def create_stat_roll_embed(rolls: list[list], selections: list[list]) -> discord
     
     embed.add_field(name="Selection", value=selstr)
     embed.add_field(name="Result", value=result, inline=False)
+    
+    return embed
+
+
+def create_character_embed(character) -> discord.Embed:
+    """
+    Creates and returns an embed to display the player's character stats.
+
+    Params:
+        character: The character object wished to be inspected
+
+    Returns:
+        discord.Embed: A rich discord embed object containing the data of
+            a character
+    """
+    
+    embed = discord.Embed(
+        title=character.name,
+        description=f"Level {character.level} {character.job}",
+        color=discord.Color.blue()
+    )
+    
+    embed.set_thumbnail(url=embed_thumbnail)
+    
+    embed.add_field(name="Strength",        value=f"{character.strength} ({character.get_stat_modifier("strength"):+})")
+    embed.add_field(name="Intelligence",    value=f"{character.intelligence} ({character.get_stat_modifier("intelligence"):+})")
+    
+    embed.add_field(name=" ", value=" ", inline=False)
+    
+    embed.add_field(name="Dexterity",       value=f"{character.dexterity} ({character.get_stat_modifier("dexterity"):+})")
+    embed.add_field(name="Wisdom",          value=f"{character.wisdom} ({character.get_stat_modifier("wisdom"):+})")
+    
+    embed.add_field(name=" ", value=" ", inline=False)
+    
+    embed.add_field(name="Constitution",    value=f"{character.constitution} ({character.get_stat_modifier("constitution"):+})")
+    embed.add_field(name="Charisma",        value=f"{character.charisma} ({character.get_stat_modifier("charisma"):+})")
+    
+    embed.add_field(name=" ", value=" ", inline=False)
+
+    saving_throws = "\n".join(stat.capitalize() for stat in job_keys[character.job]["saving_throws"])
+    proficiencies = "\n".join(f"{prof.capitalize()}{" (EXP)" if character.get_proficiency(prof) == 2 else ""}" for prof in character.proficiencies.keys())
+    prof_bonus = Character.proficiency_calculation(character.level)
+
+    embed.add_field(name="Saving Throws",   value=f"{saving_throws}\n({prof_bonus:+})")
+    embed.add_field(name="Proficiencies",   value=proficiencies)
     
     return embed
 

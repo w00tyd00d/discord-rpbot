@@ -35,10 +35,26 @@ skill_keys = {
     "persuasion": "CHA"
 }
 
+job_keys = {
+    "Artificer":    {"saving_throws": ("constitution", "intelligence")},
+    "Barbarian":    {"saving_throws": ("strength", "constitution")},
+    "Bard":         {"saving_throws": ("dexterity", "charisma")},
+    "Cleric":       {"saving_throws": ("wisdom", "charisma")},
+    "Druid":        {"saving_throws": ("intelligence", "wisdom")},
+    "Fighter":      {"saving_throws": ("strength", "constitution")},
+    "Monk":         {"saving_throws": ("strength", "dexterity")},
+    "Paladin":      {"saving_throws": ("wisdom", "charisma")},
+    "Ranger":       {"saving_throws": ("strength", "dexterity")},
+    "Rogue":        {"saving_throws": ("dexterity", "intelligence")},
+    "Sorcerer":     {"saving_throws": ("constitution", "charisma")},
+    "Warlock":      {"saving_throws": ("wisdom", "charisma")},
+    "Wizard":       {"saving_throws": ("intelligence", "wisdom")},
+}
+
 
 def get_lazy_key(data: tuple|dict, key: str, min_size = 3) -> str|None:
     """Checks if lazy key belongs to corresponding key set."""
-    if not key or len(key) < min_size:
+    if not key or type(key) is not str or len(key) < min_size:
         return None
 
     for k in data:

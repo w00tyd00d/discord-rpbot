@@ -83,7 +83,7 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    to_roll, choice, modifier, skill = None, None, None, None
+    to_roll, choice, modifier, skill, save_roll = None, None, None, None, False
     
     def is_choice(op: str) -> bool:
         if ((op[0].isdigit() and op[-1] in {"h", "l"}) or
@@ -103,6 +103,11 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
 
         if re.match(r"(\d+)*[dD]+(\d+)", op) is not None:
             to_roll = op
+
+        elif op in {"sav", "save"}:
+            if save_roll:
+                return [False]
+            save_roll = True
 
         elif get_lazy_key(adv_keys, op) or get_lazy_key(dis_keys, op):
             if choice is not None:
@@ -130,10 +135,10 @@ def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
         else:
             return [False]
 
-    return [True, to_roll, choice, modifier, skill]
+    return [True, to_roll, choice, modifier, skill, save_roll]
 
 
-def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
+def get_roll_results(char, op1: str, op2: str, op3: str) -> tuple:
     """
     Returns the results of a roll command.
 
@@ -154,7 +159,7 @@ def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
     if not res[0]:
         return "Invalid extra operations.", None
 
-    to_roll, choice, modifier, skill = res[1:]
+    to_roll, choice, modifier, skill, save_roll = res[1:]
 
     parsed = parse_dice_roll("d20" if to_roll is None else to_roll)
     
@@ -163,6 +168,6 @@ def get_roll_results(op1: str, op2: str, op3: str) -> tuple:
 
     rolls = rolling_time(*parsed)
     selected = filter_dice_rolls(rolls, choice) if choice else None
-    embed = create_roll_embed(parsed[1], rolls, selected, modifier, skill)
+    embed = create_roll_embed(char, parsed[1], rolls, selected, modifier, skill, save_roll)
     
     return "", embed
