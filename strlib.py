@@ -36,8 +36,8 @@ skill_keys = {
 }
 
 job_keys = {
-    "Artificer":    {"saving_throws": ("constitutionstitution", "intelligence")},
-    "Barbarian":    {"saving_throws": ("strengthength", "constitution")},
+    "Artificer":    {"saving_throws": ("constitution", "intelligence")},
+    "Barbarian":    {"saving_throws": ("strength", "constitution")},
     "Bard":         {"saving_throws": ("dexterity", "charisma")},
     "Cleric":       {"saving_throws": ("wisdom", "charisma")},
     "Druid":        {"saving_throws": ("intelligence", "wisdom")},
