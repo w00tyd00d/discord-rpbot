@@ -84,16 +84,13 @@ def parse_arguments(*ops) -> tuple:
         choice:   The dice filtering option (if one is provided)
         modifier: The stat modifier (if one is provided)
     """
-    to_roll = None
-    choice = None
-    stat = None
-    skill = None
-    save_roll = False
-    
+
+    adv_arg = False
+
     res = {
         "to_roll": None,
         "choice": None,
-        "modifier": None,
+        "stat": None,
         "skill": None,
         "save_roll": False,
         "flats": []
@@ -124,8 +121,9 @@ def parse_arguments(*ops) -> tuple:
             if res["choice"] is not None:
                 return [False, res]
 
+            adv_arg = True
             res["choice"] = "h1" if get_lazy_key(adv_keys, op) else "l1"
-            res["to_roll"] = "2d20" if to_roll is None else to_roll
+            res["to_roll"] = "2d20" if res["to_roll"] is None else res["to_roll"]
         
         elif (lkey := get_lazy_key(skill_keys, op, 4)):
             if res["skill"] is not None:
@@ -143,12 +141,16 @@ def parse_arguments(*ops) -> tuple:
             res["choice"] = op
 
         elif is_number(op):
-            res["flats"].append(op)
+            res["flats"].append(int(op))
 
         else:
             return [False, res]
 
-    # return [True, to_roll, choice, stat, skill, save_roll]
+    if adv_arg:
+        match res["to_roll"][0].lower():
+            case "1" | "d":
+                res["to_roll"] = "2" + res["to_roll"]
+
     return [True, res]
 
 
@@ -170,20 +172,16 @@ def get_roll_results(char, *ops) -> tuple:
     """
     
     valid, res = parse_arguments(*ops)
-
-    if not res[0]:
+    if not valid:
         return "Invalid extra operations.", None
 
-    # to_roll, choice, modifier, skill, save_roll = res[1:]
-
-
-    parsed = parse_dice_roll("d20" if to_roll is None else to_roll)
+    parsed = parse_dice_roll("d20" if res["to_roll"] is None else res["to_roll"])
     
     if type(parsed) == str:
         return parsed, None
 
     rolls = rolling_time(*parsed)
-    selected = filter_dice_rolls(rolls, choice) if choice else None
-    embed = create_roll_embed(char, parsed[1], rolls, selected, modifier, skill, save_roll)
+    selected = filter_dice_rolls(rolls, res["choice"]) if res["choice"] else None
+    embed = create_roll_embed(char, parsed[1], rolls, selected, **res)
     
     return "", embed
