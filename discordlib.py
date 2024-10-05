@@ -11,9 +11,14 @@ def create_roll_embed(character, dice_type: int, rolls: list[int], selection: li
     Creates and returns an embed to display the results of a roll command.
 
     Params:
+        character: The character object making the roll, if one exists
+        dice_type: The type of dice roll it is
         rolls: This list of resulting rolls made
         selection: The filtered selection, if one exists
-        modifier: The additional modifier, if one exists
+        stat: The additional stat modifier, if one exists
+        skill: The additional skill modifier, if one exists
+        flats: Any additional flat modifiers
+        save_roll: Whether the roll is considered a save roll
 
     Returns:
         discord.Embed: A rich discord embed object containing the results of the

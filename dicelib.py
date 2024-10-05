@@ -67,22 +67,19 @@ def rolling_time(dice_amount: int, dice_type: int) -> list[int]:
     return [randint(1, dice_type) for _ in range(dice_amount)]    
 
 
-# def parse_arguments(op1: str, op2: str, op3: str) -> tuple:
 def parse_arguments(*ops) -> tuple:
     """
-    Parses any additional operation given by a roll command and returns
-    them in a deterministic order.
+    Parses any number of operations given by a roll command and returns
+    a dictionary of results.
 
     Params:
-        op1: The first operation given
-        op2: The second operation given
+        ops: The list of passed operations to be made
 
     Returns:
-        (bool, choice | None, modifier | None)
+        (bool, dict)
         
-        bool:     Whether or not the operations given were valid
-        choice:   The dice filtering option (if one is provided)
-        modifier: The stat modifier (if one is provided)
+        bool:   Whether or not the operations given were valid
+        dict:   The parsed dictionary of data
     """
 
     adv_arg = False
@@ -114,12 +111,12 @@ def parse_arguments(*ops) -> tuple:
 
         elif op in {"sav", "save"}:
             if res["save_roll"]:
-                return [False, res]
+                return (False, res)
             res["save_roll"] = True
 
         elif get_lazy_key(adv_keys, op) or get_lazy_key(dis_keys, op):
             if res["choice"] is not None:
-                return [False, res]
+                return (False, res)
 
             adv_arg = True
             res["choice"] = "h1" if get_lazy_key(adv_keys, op) else "l1"
@@ -127,43 +124,40 @@ def parse_arguments(*ops) -> tuple:
         
         elif (lkey := get_lazy_key(skill_keys, op, 4)):
             if res["skill"] is not None:
-                return [False, res]
+                return (False, res)
             res["skill"] = lkey
             
         elif (lkey := get_lazy_key(stat_keys, op)):
             if res["stat"] is not None:
-                return [False, res]
+                return (False, res)
             res["stat"] = lkey
             
         elif is_choice(op):
             if res["choice"] is not None:
-                return [False, res]
+                return (False, res)
             res["choice"] = op
 
         elif is_number(op):
             res["flats"].append(int(op))
 
         else:
-            return [False, res]
+            return (False, res)
 
     if adv_arg:
         match res["to_roll"][0].lower():
-            case "1" | "d":
-                res["to_roll"] = "2" + res["to_roll"]
+            case "1" | "d": res["to_roll"] = "2" + res["to_roll"]
 
-    return [True, res]
+    return (True, res)
 
 
-# def get_roll_results(char, op1: str, op2: str, op3: str) -> tuple:
 def get_roll_results(char, *ops) -> tuple:
     """
     Returns the results of a roll command.
 
     Params:
-        to_roll: The dice rolling instruction
-        op1: The first extra operation
-        op2: The second extra operation
-    
+        char: The character object making the roll, if one exists
+        ops: The list of passed operations to be made
+            
     Returns:
         (str | None, discord.Embed | None)
 
