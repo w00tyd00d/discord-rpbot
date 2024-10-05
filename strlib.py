@@ -36,19 +36,19 @@ skill_keys = {
 }
 
 job_keys = {
-    "Artificer":    {"saving_throws": ("CON", "INT")},
-    "Barbarian":    {"saving_throws": ("STR", "CON")},
-    "Bard":         {"saving_throws": ("DEX", "CHA")},
-    "Cleric":       {"saving_throws": ("WIS", "CHA")},
-    "Druid":        {"saving_throws": ("INT", "WIS")},
-    "Fighter":      {"saving_throws": ("STR", "CON")},
-    "Monk":         {"saving_throws": ("STR", "DEX")},
-    "Paladin":      {"saving_throws": ("WIS", "CHA")},
-    "Ranger":       {"saving_throws": ("STR", "DEX")},
-    "Rogue":        {"saving_throws": ("DEX", "INT")},
-    "Sorcerer":     {"saving_throws": ("CON", "CHA")},
-    "Warlock":      {"saving_throws": ("WIS", "CHA")},
-    "Wizard":       {"saving_throws": ("INT", "WIS")},
+    "Artificer":    {"saving_throws": ("constitutionstitution", "intelligence")},
+    "Barbarian":    {"saving_throws": ("strengthength", "constitution")},
+    "Bard":         {"saving_throws": ("dexterity", "charisma")},
+    "Cleric":       {"saving_throws": ("wisdom", "charisma")},
+    "Druid":        {"saving_throws": ("intelligence", "wisdom")},
+    "Fighter":      {"saving_throws": ("strength", "constitution")},
+    "Monk":         {"saving_throws": ("strength", "dexterity")},
+    "Paladin":      {"saving_throws": ("wisdom", "charisma")},
+    "Ranger":       {"saving_throws": ("strength", "dexterity")},
+    "Rogue":        {"saving_throws": ("dexterity", "intelligence")},
+    "Sorcerer":     {"saving_throws": ("constitution", "charisma")},
+    "Warlock":      {"saving_throws": ("wisdom", "charisma")},
+    "Wizard":       {"saving_throws": ("intelligence", "wisdom")},
 }
 
 

@@ -6,7 +6,7 @@ from characterlib import Character
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
 
-def create_roll_embed(character, dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None) -> discord.Embed:
+def create_roll_embed(character, dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None, save_roll = False) -> discord.Embed:
     """
     Creates and returns an embed to display the results of a roll command.
 
@@ -48,17 +48,19 @@ def create_roll_embed(character, dice_type: int, rolls: list[int], selection: li
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
     prof_mod = 0
+    save_mod = 0
     
-    if modifier is not None or prof is not None:
+    if modifier is not None or prof is not None or save_mod is not None:
         modstr = ""
+        mod_stat = get_lazy_key(stat_keys, modifier)
 
         # Stat modifier
         if type(modifier) is str and character:
-            stat = get_lazy_key(stat_keys, modifier)
-            modifier = character.get_stat_modifier(stat)
-            modstr += f"{modifier:+} ({stat.upper()[:3]})\n"
+            modifier = character.get_stat_modifier(mod_stat)
+            modstr += f"{modifier:+} ({mod_stat.upper()[:3]})\n"
 
-        elif type(prof) is str and character:
+        # elif type(prof) is str and character:
+        elif skill and character:
             stat = get_lazy_key(stat_keys, skill_keys[skill])
             modifier = character.get_stat_modifier(stat)
             modstr += f"{modifier:+} ({stat.upper()[:3]})\n"
@@ -70,6 +72,11 @@ def create_roll_embed(character, dice_type: int, rolls: list[int], selection: li
         if skill and character and (prof_lvl := character.get_proficiency(skill)) > 0:
             prof_mod = character.get_proficiency_modifier(skill)
             modstr += f"{prof_mod:+} ({"EXP" if prof_lvl > 1 else "PRO"})"
+        
+        # Save roll
+        if save_roll and mod_stat and mod_stat in job_keys[character.job]["saving_throws"]:
+            save_mod = Character.proficiency_calculation(character.level)
+            modstr += f"{save_mod:+} (SAVE)"
 
         if modstr:
             embed.add_field(name="Modifier", value=modstr)
@@ -79,7 +86,7 @@ def create_roll_embed(character, dice_type: int, rolls: list[int], selection: li
         modifier = 0
 
     result = sum(selection) if selection else sum(rolls)
-    total = result + modifier + prof_mod
+    total = result + modifier + prof_mod + save_mod
     embed.add_field(name="Result", value=f'{total}', inline=False)
     
     return embed
@@ -152,7 +159,7 @@ def create_character_embed(character) -> discord.Embed:
     
     embed.add_field(name=" ", value=" ", inline=False)
 
-    saving_throws = "\n".join(get_lazy_key(stat_keys, stat).capitalize() for stat in job_keys[character.job]["saving_throws"])
+    saving_throws = "\n".join(stat.capitalize() for stat in job_keys[character.job]["saving_throws"])
     proficiencies = "\n".join(f"{prof.capitalize()}{" (EXP)" if character.get_proficiency(prof) == 2 else ""}" for prof in character.proficiencies.keys())
     prof_bonus = Character.proficiency_calculation(character.level)
 
