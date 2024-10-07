@@ -6,26 +6,30 @@ from characterlib import Character
 embed_thumbnail = "https://i.imgur.com/jrDS0br.png"
 
 
-def create_roll_embed(character, dice_type: int, rolls: list[int], selection: list[int] = None, modifier: int|str = None, prof: int|str = None, save_roll = False) -> discord.Embed:
+def create_roll_embed(character, dice_type: int, rolls: list[int], selection: list[int] = None, stat: str = None, skill: str = None, flats : list[int] = None, save_roll = False, **args) -> discord.Embed:
     """
     Creates and returns an embed to display the results of a roll command.
 
     Params:
+        character: The character object making the roll, if one exists
+        dice_type: The type of dice roll it is
         rolls: This list of resulting rolls made
         selection: The filtered selection, if one exists
-        modifier: The additional modifier, if one exists
+        stat: The additional stat modifier, if one exists
+        skill: The additional skill modifier, if one exists
+        flats: Any additional flat modifiers
+        save_roll: Whether the roll is considered a save roll
 
     Returns:
         discord.Embed: A rich discord embed object containing the results of the
             roll command
     """
 
-    skill = get_lazy_key(skill_keys, prof, 4)
     roll_type = f"D{dice_type} "
     
     if skill:
         roll_type = f"{skill.capitalize()}\n"
-    elif modifier and (key := get_lazy_key(stat_keys, modifier)):
+    elif stat and (key := get_lazy_key(stat_keys, stat)):
         roll_type = f"{key.capitalize()}\n"
 
     group = selection if selection is not None else rolls
@@ -47,46 +51,45 @@ def create_roll_embed(character, dice_type: int, rolls: list[int], selection: li
     if selection:
         embed.add_field(name="Selection", value=", ".join([str(n) for n in selection]))
     
+    stat_mod = 0
     prof_mod = 0
     save_mod = 0
     
-    if modifier is not None or prof is not None or save_mod is not None:
+    if stat is not None or skill is not None or save_mod is not None:
         modstr = ""
-        mod_stat = get_lazy_key(stat_keys, modifier)
 
         # Stat modifier
-        if type(modifier) is str and character:
-            modifier = character.get_stat_modifier(mod_stat)
-            modstr += f"{modifier:+} ({mod_stat.upper()[:3]})\n"
+        if stat and character:
+            stat_mod = character.get_stat_modifier(stat)
+            modstr += f"{stat_mod:+} ({stat.upper()[:3]})\n"
 
-        # elif type(prof) is str and character:
         elif skill and character:
             stat = get_lazy_key(stat_keys, skill_keys[skill])
-            modifier = character.get_stat_modifier(stat)
-            modstr += f"{modifier:+} ({stat.upper()[:3]})\n"
+            stat_mod = character.get_stat_modifier(stat)
+            modstr += f"{stat_mod:+} ({stat.upper()[:3]})\n"
 
-        elif modifier is not None and type(modifier) is int:
-            modstr = f"{modifier:+}"
-        
         # Proficiency modifier
         if skill and character and (prof_lvl := character.get_proficiency(skill)) > 0:
             prof_mod = character.get_proficiency_modifier(skill)
-            modstr += f"{prof_mod:+} ({"EXP" if prof_lvl > 1 else "PRO"})"
+            modstr += f"{prof_mod:+} ({"EXP" if prof_lvl > 1 else "PRO"})\n"
         
         # Save roll
-        if save_roll and mod_stat and mod_stat in job_keys[character.job]["saving_throws"]:
+        if save_roll and stat and stat in job_keys[character.job]["saving_throws"]:
             save_mod = Character.proficiency_calculation(character.level)
-            modstr += f"{save_mod:+} (SAVE)"
+            modstr += f"{save_mod:+} (SAVE)\n"
+
+        # Flat modifiers
+        if flats is not None:
+            for num in flats:
+                modstr += f"{num:+}\n"
 
         if modstr:
             embed.add_field(name="Modifier", value=modstr)
     
-    if modifier is None or not type(modifier) is int:
-        # w00t: Hard set modifier to 0 for sum calculation
-        modifier = 0
-
     result = sum(selection) if selection else sum(rolls)
-    total = result + modifier + prof_mod + save_mod
+    flat_sum = sum(flats) if flats is not None else 0
+    total = result + stat_mod + prof_mod + save_mod + flat_sum
+    
     embed.add_field(name="Result", value=f'{total}', inline=False)
     
     return embed

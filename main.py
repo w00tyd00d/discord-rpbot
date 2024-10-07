@@ -84,16 +84,16 @@ async def register_dm(ctx, user : discord.Member = None):
 
 
 @bot.command(name="roll")
-async def roll_dice(ctx, op1 = None, op2 = None, op3 = None):
+async def roll_dice(ctx, *ops):
     character = get_character(ctx.author.id)
-    string, embed = get_roll_results(character, op1, op2, op3)
+    string, embed = get_roll_results(character, *ops)
     await send_message(ctx.channel, string, embed)
 
 
 @bot.command(name="rolldm")
-async def roll_dice_dm(ctx, op1 = None, op2 = None, op3 = None):
+async def roll_dice_dm(ctx, *ops):
     character = get_character(ctx.author.id)
-    string, embed = get_roll_results(character, op1, op2, op3)
+    string, embed = get_roll_results(character, *ops)
     dm = get_member(dungeon_master_id)
 
     if ctx.author != dm or not embed:
